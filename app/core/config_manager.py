@@ -7,10 +7,15 @@ logger = logging.getLogger(__name__)
 class ConfigManager:
     @staticmethod
     def get_config_path(project_path, version):
-        if version == ">=5.13":
+        if version >= (5, 13):
             return os.path.join(project_path, "tools", "Callisto", "exports.toml")
-        else:
+        elif version >= (5, 10):
             return os.path.join(project_path, "buildtool", "exports.toml")
+        elif version >= (5, 0):
+             # v5.00 - v5.09: use project.toml in buildtool folder
+             return os.path.join(project_path, "buildtool", "project.toml")
+        else:
+             return None
 
     @staticmethod
     def check_exports_toml(project_path, version):
@@ -67,8 +72,11 @@ class ConfigManager:
         config_path = ConfigManager.get_config_path(project_path, version)
         
         try:
-            with open(config_path, 'r') as f:
-                config = toml.load(f)
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config = toml.load(f)
+            else:
+                config = {} # Create new if missing
 
             # We need to set it. Where? 
             # If we didn't find it before, we might need to know where to add it.

@@ -1,0 +1,12 @@
+{
+    "last_project": "D:/Games/Kaizo/Community Hack 2",
+    "optimize_columns": true,
+    "add_empty_line": true,
+    "blank_tile_id": "0F8",
+    "act_as": "0025 (Air)",
+    "palette": 0,
+    "priority": false,
+    "start_page": 96,
+    "tile_size": "8x8",
+    "font_size": "8x8"
+}

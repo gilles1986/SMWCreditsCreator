@@ -1,8 +1,10 @@
 import customtkinter as ctk
 from tkinter import filedialog
 import threading
+import os # Added
 from app.core.validator import Validator
 from app.core.config_manager import ConfigManager
+from app.core.app_config import AppConfig # Added
 from app.ui.theme import Theme
 
 class ProjectTab:
@@ -10,29 +12,34 @@ class ProjectTab:
         self.master = master
         self.project_path = None
         self.rhr_version = None
+        self.config = AppConfig() # Added
         
+        # UI Setup
+        self.setup_ui() # Added
+        
+        # Load Last Project
+        last_proj = self.config.get("last_project") # Added
+        if last_proj and os.path.exists(last_proj): # Added
+            self.load_project(last_proj) # Added
+
+    def setup_ui(self): # Added method
         # Grid layout
         self.master.grid_columnconfigure(0, weight=1)
         
-        # Title
-        self.label = ctk.CTkLabel(self.master, text="Select RHR Project Folder", font=Theme.FONT_HEADER)
-        self.label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
-
-        # Path Selection Frame
-        self.path_frame = ctk.CTkFrame(self.master)
-        self.path_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
-        self.path_frame.grid_columnconfigure(0, weight=1)
-
-        self.path_entry = ctk.CTkEntry(self.path_frame, placeholder_text="No folder selected")
-        self.path_entry.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        self.path_entry.configure(state="readonly") # User should use browse button
-
-        self.browse_button = ctk.CTkButton(self.path_frame, text="Browse", command=self.browse_folder)
-        self.browse_button.grid(row=0, column=1, padx=10, pady=10)
+        # 1. Folder Selection
+        self.sel_frame = ctk.CTkFrame(self.master) # Changed from path_frame
+        self.sel_frame.grid(row=0, column=0, padx=20, pady=20, sticky="ew") # Changed row and pady
+        self.sel_frame.grid_columnconfigure(0, weight=1)
+        
+        self.lbl_path = ctk.CTkLabel(self.sel_frame, text="No Project Selected", font=Theme.FONT_BOLD, text_color=Theme.TEXT_ERROR) # Changed from path_entry and label
+        self.lbl_path.grid(row=0, column=0, padx=10, pady=10, sticky="w") # Changed from path_entry grid
+        
+        self.btn_browse = ctk.CTkButton(self.sel_frame, text="Select RHR Folder", command=self.browse_folder, fg_color=Theme.BTN_PRIMARY, text_color=Theme.BTN_PRIMARY_TEXT) # Changed from browse_button
+        self.btn_browse.grid(row=0, column=1, padx=10, pady=10) # Changed from browse_button grid
 
         # Status Area
         self.status_frame = ctk.CTkFrame(self.master)
-        self.status_frame.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+        self.status_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew") # Changed row from 2 to 1
         self.status_frame.grid_columnconfigure(1, weight=1)
 
         self.lbl_valid = ctk.CTkLabel(self.status_frame, text="Project Status:", font=Theme.FONT_BOLD)
@@ -61,12 +68,14 @@ class ProjectTab:
     def browse_folder(self):
         folder = filedialog.askdirectory()
         if folder:
-            self.project_path = folder
-            self.path_entry.configure(state="normal")
-            self.path_entry.delete(0, "end")
-            self.path_entry.insert(0, folder)
-            self.path_entry.configure(state="readonly")
-            self.validate_project()
+            self.load_project(folder)
+            
+    def load_project(self, folder):
+        self.project_path = folder
+        self.lbl_path.configure(text=folder, text_color=Theme.TEXT_NORMAL)
+        self.validate_project()
+        # Save to config
+        self.config.set("last_project", folder)
 
     def validate_project(self):
         if not self.project_path:
