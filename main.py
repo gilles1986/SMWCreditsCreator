@@ -1,27 +1,34 @@
 import logging
-import os
+import sys
+import traceback
 import customtkinter as ctk
-from app.ui.main_window import MainWindow
+from tkinter import messagebox
 
-# Setup Logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("app.log"),
-        logging.StreamHandler()
-    ]
-)
+# Configure logging
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    filename='app.log',
+                    filemode='a')
+
 logger = logging.getLogger(__name__)
 
-def main():
-    logger.info("Starting SMW Credits Creator")
-    
-    ctk.set_appearance_mode("System")
-    ctk.set_default_color_theme("blue")
-
-    app = MainWindow()
-    app.mainloop()
-
 if __name__ == "__main__":
-    main()
+    try:
+        from app.ui.main_window import MainWindow
+        logger.info("Starting SMW Credits Creator")
+        app = MainWindow()
+        app.mainloop()
+    except Exception as e:
+        logger.critical("Fatal Error", exc_info=True)
+        # Show error window
+        root = None
+        try:
+            import tkinter as tk
+            root = tk.Tk()
+            root.withdraw()
+        except:
+             pass
+        
+        err_msg = "".join(traceback.format_exception(None, e, e.__traceback__))
+        messagebox.showerror("Critical Error", f"Failed to start:\n{err_msg}")
+        if root: root.destroy()

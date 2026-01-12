@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMW Credits Creator - User Manual</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f9;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #2c3e50;
+        }
+
+        h1 {
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            text-align: center;
+        }
+
+        h2 {
+            margin-top: 30px;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 5px;
+            color: #2980b9;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        code {
+            background-color: #f0f0f0;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: Consolas, monospace;
+            color: #e74c3c;
+        }
+
+        pre {
+            background-color: #2d3436;
+            color: #dfe6e9;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border-left: 5px solid #3498db;
+        }
+
+        .note {
+            background-color: #e8f6f3;
+            border-left: 5px solid #1abc9c;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .warning {
+            background-color: #fdedec;
+            border-left: 5px solid #e74c3c;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .step {
+            font-weight: bold;
+            color: #fff;
+            background-color: #3498db;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        footer {
+            margin-top: 50px;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.9em;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+
+        .feature-box {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .feature {
+            flex: 1;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #eee;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>SMW Credits Creator</h1>
+        <p style="text-align: center; font-size: 1.1em;">The ultimate tool to automate generic credits generation for
+            SMW ROM hacks using the RHR system.</p>
+
+        <div class="note">
+            <strong>New Feature:</strong> Fully compatible with the online <strong>SMW Credits Manager</strong> at <a
+                href="https://saphros.de/smwcredits/" target="_blank">saphros.de/smwcredits/</a>.
+        </div>
+
+        <h2>🚀 Installation</h2>
+        <p>No installation is required. The tool is portable.</p>
+        <ol>
+            <li>Unzip the downloaded archive completely.</li>
+            <li>Ensure <code>config.template.json</code> and <code>mapping.json</code> are present in the folder.</li>
+            <li>Run the <strong>SMWCreditsCreator.exe</strong>.</li>
+        </ol>
+
+        <h2>🎮 Workflow</h2>
+
+        <h3>1. Setup Project</h3>
+        <p>Click <span class="step">Select RHR Folder</span> and choose your project's root directory.</p>
+        <ul>
+            <li><strong>Supported Versions:</strong> RHR v5.00 up to v5.13+.</li>
+            <li><strong>Auto-Detection:</strong> The tool detects your version via <code>changelog.txt</code>.</li>
+            <li><strong>Configuration Fix:</strong> If your project isn't set up for text-based Map16 (required for
+                automation), the tool will warn you. Click <span class="step">Fix Configuration</span> to handle
+                everything automatically (Config update + Initial Export).</li>
+        </ul>
+
+        <h3>2. Prepare Credits Data</h3>
+        <p>You have two options to provide the credits names:</p>
+
+        <div class="feature-box">
+            <div class="feature">
+                <h3>Option A: Online Generator (Recommended)</h3>
+                <p>Use the visual editor at <a href="https://saphros.de/smwcredits/"
+                        target="_blank">saphros.de/smwcredits/</a>.</p>
+                <ol>
+                    <li>Enter your categories and names easily online.</li>
+                    <li>Click the <strong>Download JSON</strong> button.</li>
+                    <li>Load this <code>.json</code> file into the tool.</li>
+                </ol>
+            </div>
+            <div class="feature">
+                <h3>Option B: Manual Text File</h3>
+                <p>Create a simple <code>.txt</code> file on your computer.</p>
+                <ul>
+                    <li><strong>Headers:</strong> End lines with a colon <code>:</code> (e.g. "Resources:")</li>
+                    <li><strong>Names:</strong> One name per line below the header.</li>
+                </ul>
+            </div>
+        </div>
+
+        <h3>3. Generate & Insert</h3>
+        <ol>
+            <li>Load your <code>.json</code> or <code>.txt</code> file in the tool.</li>
+            <li>Adjust settings (e.g., Font Size <code>8x8</code> or <code>16x16</code>).</li>
+            <li>Click <span class="step">Generate Map16</span>.</li>
+        </ol>
+        <div class="note">
+            <strong>What happens next?</strong><br>
+            The tool will generate Map16 files containing your text as tiles and automatically run
+            <code>callisto update</code> to insert them into your ROM immediately.
+        </div>
+
+        <h2>⚠️ Important Notes</h2>
+        <ul>
+            <li><strong>Callisto Safety:</strong> The tool performs a safety <code>callisto save</code> before
+                generating to ensure no data is lost during the Map16 text-format conversion.</li>
+            <li><strong>Mapping:</strong> Use the <strong>Mapping Tab</strong> to customize which tile ID represents
+                which character. This must match your <code>ExGFX</code> font file in Lunar Magic.</li>
+        </ul>
+
+        <h2>❓ Troubleshooting</h2>
+        <p><strong>The window stays black on start?</strong><br>
+            Wait a few seconds. The application loads the icon delayed to prevent freezing. Check <code>app.log</code>
+            if it persists.</p>
+
+        <p><strong>"Invalid Project" Error?</strong><br>
+            Ensure you selected the root folder (where <code>flips.exe</code> or <code>changelog.txt</code> resides),
+            not the <code>buildtool</code> folder.</p>
+
+    </div>
+
+    <footer>
+        <p>SMW Credits Creator v1.0.0 &copy; 2026 Saphros</p>
+    </footer>
+
+</body>
+
+</html>

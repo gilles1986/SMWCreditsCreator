@@ -270,6 +270,15 @@ class CreditsTab:
              self.log("Error: No Project selected.")
              return
              
+        # 1.5 Safety Save - Ensure Map16 files exist in text format
+        from app.core.callisto_handler import CallistoHandler
+        self.log("Running safety 'callisto save'...")
+        ok, msg = CallistoHandler.save(self.project_path, self.rhr_version)
+        if not ok:
+             self.log(f"Error executing save: {msg}")
+             self.log("Aborting to prevent data corruption. Please check Callisto.")
+             return
+
         # 2. Parse Credits
         self.log(f"Parsing {os.path.basename(self.credits_path)}...")
         credits_data = CreditsParser.parse_file(self.credits_path)

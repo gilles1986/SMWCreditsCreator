@@ -16,7 +16,19 @@ class AppConfig:
             cls._instance.load()
         return cls._instance
 
+    TEMPLATE_FILE = "config.template.json"
+
     def load(self):
+        # Initial template copy if missing
+        if not os.path.exists(self.CONFIG_FILE):
+             if os.path.exists(self.TEMPLATE_FILE):
+                 import shutil
+                 try:
+                     shutil.copy(self.TEMPLATE_FILE, self.CONFIG_FILE)
+                     logger.info(f"Initialized {self.CONFIG_FILE} from template.")
+                 except Exception as e:
+                     logger.error(f"Could not copy template: {e}")
+
         if os.path.exists(self.CONFIG_FILE):
             try:
                 with open(self.CONFIG_FILE, 'r') as f:
