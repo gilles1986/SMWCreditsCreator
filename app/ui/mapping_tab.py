@@ -372,21 +372,39 @@ class MappingTab:
                                fg_color=Theme.BTN_SECONDARY,
                                hover_color=Theme.BTN_PRIMARY,
                                command=lambda i=idx: self.set_sub_picker_index(i))
+             b._sub_idx = idx
              return b
+
+        # "Single" Button (Block Mode) -> Index None
+        b_single = make_btn(None, "Block")
+        b_single.pack(side="left", padx=5)
+        self.sub_btns.append(b_single)
+        
+        # Separator
+        ctk.CTkLabel(comp_container, text="|", text_color="gray").pack(side="left", padx=2)
 
         if tile_size == "8x16":
              # Vertical Stack
+             # Layout: [ Block ] | [ Top ]
+             #                   [ Btm ]
+             
+             stack_frame = ctk.CTkFrame(comp_container, fg_color="transparent")
+             stack_frame.pack(side="left", padx=5)
+             
              b_top = make_btn(0, "Top")
-             b_top.pack(side="top", pady=1)
+             b_top.pack(in_=stack_frame, side="top", pady=1)
              b_btm = make_btn(1, "Btm")
-             b_btm.pack(side="top", pady=1)
-             self.sub_btns = [b_top, b_btm]
+             b_btm.pack(in_=stack_frame, side="top", pady=1)
+             self.sub_btns.extend([b_top, b_btm])
              
         elif tile_size == "16x16":
              # 2x2 Grid
-             f_top = ctk.CTkFrame(comp_container, fg_color="transparent")
+             grid_frame = ctk.CTkFrame(comp_container, fg_color="transparent")
+             grid_frame.pack(side="left", padx=5)
+             
+             f_top = ctk.CTkFrame(grid_frame, fg_color="transparent")
              f_top.pack()
-             f_btm = ctk.CTkFrame(comp_container, fg_color="transparent")
+             f_btm = ctk.CTkFrame(grid_frame, fg_color="transparent")
              f_btm.pack()
              
              b_tl = make_btn(0, "TL")
@@ -398,16 +416,18 @@ class MappingTab:
              b_bl.pack(in_=f_btm, side="left", padx=1, pady=1)
              b_br = make_btn(3, "BR")
              b_br.pack(in_=f_btm, side="left", padx=1, pady=1)
-             self.sub_btns = [b_tl, b_tr, b_bl, b_br]
+             self.sub_btns.extend([b_tl, b_tr, b_bl, b_br])
 
-        # Select first by default
-        self.set_sub_picker_index(0)
+        # Select "Block" (None) by default
+        self.set_sub_picker_index(None)
 
     def set_sub_picker_index(self, idx):
         self.picker_sub_index = idx
         # Update styling
-        for i, btn in enumerate(self.sub_btns):
-             if i == idx:
+        for btn in self.sub_btns:
+             # Check semantic index stored on button
+             btn_idx = getattr(btn, '_sub_idx', object())
+             if btn_idx == idx:
                   btn.configure(fg_color=Theme.BTN_PRIMARY, border_color="white", border_width=1)
              else:
                   btn.configure(fg_color=Theme.BTN_SECONDARY, border_width=0)
