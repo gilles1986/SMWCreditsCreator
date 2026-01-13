@@ -165,6 +165,7 @@ class Map16Generator:
         self.act_as = options.get("act_as", "0025")
         self.palette = options.get("palette", 0)
         self.priority = options.get("priority", False)
+        self.font_size = options.get("font_size", "8x8")
         
         optimize = options.get("optimize_columns", False)
         add_empty = options.get("add_empty_line", False)
@@ -274,59 +275,103 @@ class Map16Generator:
 
     def _pack_char_ids_into_map16_row(self, char_ids):
         """
-        Takes up to 32 8x8 tile IDs and packs them into 16 Map16Tiles.
+        Packs characters into 16 Map16Tiles based on font_size.
         """
         map16_tiles = []
-        # Ensure 32 length
-        padded = char_ids + [self.blank_tile_id] * (32 - len(char_ids))
         
-        # We need to form 16x16 tiles.
-        # Each 16x16 tile has TL, TR, BL, BR
-        # Since this is text, we assume 8x8 font.
-        # Usually text is 1 tile high? 
-        # If user selected "8x8" mode:
-        #   A line of text is 8 pixels high.
-        #   Within a 16x16 block, we can fit 2 lines of text? Or 1 line centered?
-        #   User said: "Wir sollten bei 8x8 großer Schrift auch abfragen ob eine Leerzeile erzeugt werden soll."
-        #   And "0F8 ... ist ein transparenter Block".
-        
-        # Let's assume 1 row of text occupies the TOP half of the 16x16 blocks.
-        # The BOTTOM half is left empty (blank).
-        # This effectively gives line-height of 16px for 8px text.
-        
-        # Pairs: (TL, TR) come from the char stream.
-        # BL, BR are always blank.
-        
-        for i in range(0, 32, 2):
-            tl_id = padded[i]
-            tr_id = padded[i+1]
-            bl_id = self.blank_tile_id
-            br_id = self.blank_tile_id
-            
-            # Create sub-tiles
-            # Use mapper settings for palette/priority
-            pal = self.palette
-            prio = self.priority
-            
-            # Note: We need to respect flipped flags if we ever support them in mapping?
-            # Current mapping is just ID.
-            
-            tl = Map16SubTile(tl_id, pal, False, False, prio)
-            tr = Map16SubTile(tr_id, pal, False, False, prio)
-            bl = Map16SubTile(bl_id, pal, False, False, prio)
-            br = Map16SubTile(br_id, pal, False, False, prio)
-            
-            # Create Tile
-            # Check for Empty logic? If all are blank?
-            # If all are blank, is_empty = True?
-            # Map16Tile construction
-            tile = Map16Tile("0000", self.act_as, [tl, bl, tr, br]) # ORDER: TL, BL, TR, BR
-            
-            # Mark tile as empty if all 4 sub-tiles are blank (to use ~ shorthand)
-            if all(st.tile_id == self.blank_tile_id for st in [tl, tr, bl, br]):
-                tile.is_empty = True
-            
-            map16_tiles.append(tile)
-            
+        # Helper to parse ID string -> list of ints
+        def parse_ids(id_str):
+             if not id_str: return []
+             try:
+                 parts = id_str.split(',')
+                 return [p.strip() for p in parts if p.strip()]
+             except:
+                 return [id_str]
+
+        # Helper to get sub-tile string (handle hex)
+        def fmt(val):
+             try:
+                  if isinstance(val, int): return f"{val:03X}"
+                  return val
+             except: return val
+
+        if self.font_size == "16x16":
+             # 1 Char = 1 Map16 Tile
+             row_chars = char_ids[:16]
+             row_chars += [self.blank_tile_id] * (16 - len(row_chars))
+             
+             for cid in row_chars:
+                  parts = parse_ids(cid)
+                  
+                  t_tl = parts[0]
+                  t_tr = f"{int(t_tl, 16)+1:03X}" if len(parts) < 2 else parts[1]
+                  t_bl = f"{int(t_tl, 16)+0x10:03X}" if len(parts) < 3 else parts[2]
+                  t_br = f"{int(t_tl, 16)+0x11:03X}" if len(parts) < 4 else parts[3]
+                  
+                  tile = Map16Tile(f"0000", self.act_as)
+                  tile.sub_tiles[0].tile_id = fmt(t_tl)
+                  tile.sub_tiles[1].tile_id = fmt(t_bl)
+                  tile.sub_tiles[2].tile_id = fmt(t_tr)
+                  tile.sub_tiles[3].tile_id = fmt(t_br)
+                  for st in tile.sub_tiles:
+                       st.palette = self.palette
+                       st.priority = self.priority
+                  map16_tiles.append(tile)
+
+        elif self.font_size == "8x16":
+             # 2 Chars per Map16 Tile
+             padded = char_ids + [self.blank_tile_id] * (32 - len(char_ids))
+             
+             for i in range(0, 32, 2):
+                  c1 = padded[i]
+                  c2 = padded[i+1]
+                  
+                  p1 = parse_ids(c1)
+                  p2 = parse_ids(c2)
+                  
+                  t_tl = p1[0]
+                  t_bl = f"{int(t_tl, 16)+1:03X}" if len(p1) < 2 else p1[1]
+
+                  t_tr = p2[0]
+                  t_br = f"{int(t_tr, 16)+1:03X}" if len(p2) < 2 else p2[1]
+                  
+                  tile = Map16Tile(f"0000", self.act_as)
+                  tile.sub_tiles[0].tile_id = fmt(t_tl)
+                  tile.sub_tiles[1].tile_id = fmt(t_bl)
+                  tile.sub_tiles[2].tile_id = fmt(t_tr)
+                  tile.sub_tiles[3].tile_id = fmt(t_br)
+                  
+                  for st in tile.sub_tiles:
+                       st.palette = self.palette
+                       st.priority = self.priority
+                  map16_tiles.append(tile)
+
+        else: # 8x8 (Default)
+             padded = char_ids + [self.blank_tile_id] * (32 - len(char_ids))
+             
+             for i in range(0, 32, 2):
+                  c1 = padded[i]
+                  c2 = padded[i+1]
+                  
+                  p1 = parse_ids(c1)
+                  p2 = parse_ids(c2)
+                  
+                  t_tl = p1[0]
+                  t_bl = p1[1] if len(p1) > 1 else self.blank_tile_id
+                  
+                  t_tr = p2[0]
+                  t_br = p2[1] if len(p2) > 1 else self.blank_tile_id
+                  
+                  tile = Map16Tile(f"0000", self.act_as)
+                  tile.sub_tiles[0].tile_id = fmt(t_tl)
+                  tile.sub_tiles[1].tile_id = fmt(t_bl)
+                  tile.sub_tiles[2].tile_id = fmt(t_tr)
+                  tile.sub_tiles[3].tile_id = fmt(t_br)
+                  
+                  for st in tile.sub_tiles:
+                       st.palette = self.palette
+                       st.priority = self.priority
+                  map16_tiles.append(tile)
+
         return map16_tiles
 

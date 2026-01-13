@@ -335,7 +335,8 @@ class CreditsTab:
             "blank_tile": self.ent_blank.get(),
             "act_as": act_val,
             "palette": self.config.get("palette", 0),
-            "priority": self.config.get("priority", False)
+            "priority": self.config.get("priority", False),
+            "font_size": self.config.get("tile_size", "8x8")
         }
         
         tiles = generator.generate_credits_tiles(credits_data, options)

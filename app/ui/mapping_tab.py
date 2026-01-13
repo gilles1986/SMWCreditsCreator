@@ -140,7 +140,9 @@ class MappingTab:
 
         self.entries = {}
         self.icon_labels = {}
-        self.picker_target = None  # Track which entry is waiting for picker selection 
+        self.picker_target = None  # Track which entry is waiting for picker selection
+        self.picker_sub_index = None # Index of sub-tile being picked (0=Top/TL, 1=Bottom/TR, etc)
+        self.picker_sub_vals = [] # List of current tile IDs in composition 
         
         # Auto-load default
         success, msg = self.mapper.load_default_mappings()
@@ -302,13 +304,113 @@ class MappingTab:
     def activate_picker(self, target_entry):
         """Activate picker mode for selecting a tile from the canvas"""
         self.picker_target = target_entry
+        self.picker_sub_index = None
+        self.picker_sub_vals = []
+
+        # Visual feedback: highlight the target entry
+        target_entry.configure(border_color=Theme.BTN_PRIMARY, border_width=2)
+        
         # Change cursor globally
         self.master.configure(cursor="crosshair")
         self.gfx_canvas.configure(cursor="crosshair")
-        # Visual feedback: highlight the target entry
-        target_entry.configure(border_color=Theme.BTN_PRIMARY, border_width=2)
+        
         # Bind click outside canvas to cancel
         self.master.bind("<Button-1>", self.on_picker_click, add="+")
+
+        # Check Tile Size for Advanced Picker
+        tile_size = self.tile_size_var.get()
+        if tile_size == "8x8":
+            # Standard single 8x8 picker
+            return
+
+        # --- Advanced Picker Setup ---
+        
+        # 1. Parse current values
+        val = target_entry.get().strip()
+        try:
+             parts = [int(p, 16) for p in val.split(',') if p.strip()]
+        except:
+             parts = []
+             
+        # Default fallback if empty
+        if not parts:
+            parts = [0] * (2 if tile_size == "8x16" else 4)
+            
+        # Ensure correct length (pad or truncate)
+        req_len = 2 if tile_size == "8x16" else 4
+        if len(parts) < req_len:
+             # Fill with sequential defaults based on first item (or 0)
+             start = parts[0] if parts else 0
+             if tile_size == "8x16":
+                  parts = [start, start + 1]
+             else: # 16x16
+                  parts = [start, start+1, start+0x10, start+0x11]
+        self.picker_sub_vals = parts[:req_len]
+        
+        # 2. Show Composition UI
+        self.show_sub_picker_ui(tile_size)
+    
+    def show_sub_picker_ui(self, tile_size):
+        # Remove existing if any
+        if getattr(self, 'sub_picker_frame', None):
+             self.sub_picker_frame.destroy()
+             
+        self.sub_picker_frame = ctk.CTkFrame(self.middle_frame, fg_color=Theme.BG_COLOR_2, border_width=1, border_color="#404040")
+        self.sub_picker_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(10, 0)) # Insert between graphics and grid
+        
+        ctk.CTkLabel(self.sub_picker_frame, text="Composite Picker", font=("Arial", 11, "bold")).pack(pady=2)
+        
+        # Container for composition buttons
+        comp_container = ctk.CTkFrame(self.sub_picker_frame, fg_color="transparent")
+        comp_container.pack(pady=5, padx=5)
+        
+        self.sub_btns = []
+        
+        def make_btn(idx, txt):
+             b = ctk.CTkButton(comp_container, text=txt, width=40, height=30, 
+                               font=("Arial", 10),
+                               fg_color=Theme.BTN_SECONDARY,
+                               hover_color=Theme.BTN_PRIMARY,
+                               command=lambda i=idx: self.set_sub_picker_index(i))
+             return b
+
+        if tile_size == "8x16":
+             # Vertical Stack
+             b_top = make_btn(0, "Top")
+             b_top.pack(side="top", pady=1)
+             b_btm = make_btn(1, "Btm")
+             b_btm.pack(side="top", pady=1)
+             self.sub_btns = [b_top, b_btm]
+             
+        elif tile_size == "16x16":
+             # 2x2 Grid
+             f_top = ctk.CTkFrame(comp_container, fg_color="transparent")
+             f_top.pack()
+             f_btm = ctk.CTkFrame(comp_container, fg_color="transparent")
+             f_btm.pack()
+             
+             b_tl = make_btn(0, "TL")
+             b_tl.pack(in_=f_top, side="left", padx=1, pady=1)
+             b_tr = make_btn(1, "TR")
+             b_tr.pack(in_=f_top, side="left", padx=1, pady=1)
+             
+             b_bl = make_btn(2, "BL")
+             b_bl.pack(in_=f_btm, side="left", padx=1, pady=1)
+             b_br = make_btn(3, "BR")
+             b_br.pack(in_=f_btm, side="left", padx=1, pady=1)
+             self.sub_btns = [b_tl, b_tr, b_bl, b_br]
+
+        # Select first by default
+        self.set_sub_picker_index(0)
+
+    def set_sub_picker_index(self, idx):
+        self.picker_sub_index = idx
+        # Update styling
+        for i, btn in enumerate(self.sub_btns):
+             if i == idx:
+                  btn.configure(fg_color=Theme.BTN_PRIMARY, border_color="white", border_width=1)
+             else:
+                  btn.configure(fg_color=Theme.BTN_SECONDARY, border_width=0)
             
     def update_mapping(self, char, entry):
         val = entry.get().strip()
@@ -326,37 +428,112 @@ class MappingTab:
         tile_size = self.tile_size_var.get()
         scale = self.gfx_scale
         
-        # Calculate tile dimensions in pixels (at scale)
+        # Calculate tile dimensions for final icon
         if tile_size == "8x8":
-            tile_w_px, tile_h_px = 8 * scale, 8 * scale
+            icon_w, icon_h = 8 * scale, 8 * scale
         elif tile_size == "8x16":
-            tile_w_px, tile_h_px = 8 * scale, 16 * scale
+            icon_w, icon_h = 8 * scale, 16 * scale
         else:  # 16x16
-            tile_w_px, tile_h_px = 16 * scale, 16 * scale
-        
+            icon_w, icon_h = 16 * scale, 16 * scale
+            
+        w_tiles = self.width_in_tiles
+
         for char, entry in self.entries.items():
              val = entry.get().strip()
+             if not val:
+                 self.icon_labels[char].configure(image=None)
+                 continue
+
              try:
-                 tile_id = int(val, 16)
-                 local_idx = tile_id - base_offset
-                 if 0 <= local_idx < (len(self.raw_pixels)//64):
-                      w_tiles = self.width_in_tiles
-                      row = local_idx // w_tiles
-                      col = local_idx % w_tiles
-                      
-                      px_per_tile = 8 * scale
-                      
-                      x = col * px_per_tile
-                      y = row * px_per_tile
-                      
-                      crop = self.full_pil_img.crop((x, y, x+tile_w_px, y+tile_h_px))
-                      img = ctk.CTkImage(light_image=crop, dark_image=crop, size=(tile_w_px, tile_h_px))
+                 # Parse IDs (handle comma-separation)
+                 # e.g. "280,292" -> [280, 292]
+                 ids = []
+                 parts = val.split(',')
+                 for p in parts:
+                     if p.strip():
+                        ids.append(int(p.strip(), 16))
+                 
+                 # Create composite image
+                 if not ids:
+                     self.icon_labels[char].configure(image=None)
+                     continue
+                     
+                 # Determine logic based on tile size
+                 # Case 1: 8x8 -> Just take first ID
+                 # Case 2: 8x16 -> Expect 2 IDs (Top, Bottom). If 1 ID, calculate bottom = ID+1 (legacy fallback)
+                 # Case 3: 16x16 -> Expect 4 IDs (TL, TR, BL, BR). If 1 ID, calculate standard block logic.
+                 
+                 # Create blank canvas for icon
+                 from PIL import Image
+                 composite = Image.new("RGB", (icon_w, icon_h), (0, 0, 0))
+                 
+                 # Helper to get crop
+                 def get_crop(tid):
+                     local_idx = tid - base_offset
+                     if 0 <= local_idx < (len(self.raw_pixels)//64):
+                         row = local_idx // w_tiles
+                         col = local_idx % w_tiles
+                         px = 8 * scale
+                         x = col * px
+                         y = row * px
+                         return self.full_pil_img.crop((x, y, x+px, y+px))
+                     return None
+
+                 # Draw Logic
+                 draw_success = False
+                 px = 8 * scale
+                 
+                 if tile_size == "8x8":
+                     crop = get_crop(ids[0])
+                     if crop:
+                         composite.paste(crop, (0, 0))
+                         draw_success = True
+                         
+                 elif tile_size == "8x16":
+                     # Top Tile
+                     t1 = ids[0]
+                     crop1 = get_crop(t1)
+                     if crop1: composite.paste(crop1, (0, 0))
+                     
+                     # Bottom Tile
+                     if len(ids) >= 2:
+                         t2 = ids[1]
+                     else:
+                         t2 = t1 + 1 # Fallback standard
+                     
+                     crop2 = get_crop(t2)
+                     if crop2: composite.paste(crop2, (0, px))
+                     draw_success = True
+                     
+                 elif tile_size == "16x16":
+                     # TL
+                     t1 = ids[0]
+                     c1 = get_crop(t1)
+                     if c1: composite.paste(c1, (0, 0))
+                     
+                     if len(ids) >= 4:
+                         t2, t3, t4 = ids[1], ids[2], ids[3]
+                     else:
+                         # Fallback standard
+                         t2, t3, t4 = t1+1, t1+0x10, t1+0x11
+                     
+                     c2 = get_crop(t2) # TR
+                     if c2: composite.paste(c2, (px, 0))
+                     c3 = get_crop(t3) # BL
+                     if c3: composite.paste(c3, (0, px))
+                     c4 = get_crop(t4) # BR
+                     if c4: composite.paste(c4, (px, px))
+                     draw_success = True
+
+                 if draw_success:
+                      img = ctk.CTkImage(light_image=composite, dark_image=composite, size=(icon_w, icon_h))
                       self.icon_labels[char].configure(image=img)
                       self.icon_labels[char]._image = img 
                  else:
                       self.icon_labels[char].configure(image=None)
+                      
              except Exception as e:
-                 # Silently fail for invalid hex
+                 # Silently fail
                  self.icon_labels[char].configure(image=None)
 
     def save_mapping(self):
@@ -469,6 +646,14 @@ class MappingTab:
         if self.picker_target:
             self.picker_target.configure(border_width=1)
             self.picker_target = None
+        
+        self.picker_sub_index = None
+        self.picker_sub_vals = []
+        
+        if getattr(self, 'sub_picker_frame', None):
+             self.sub_picker_frame.destroy()
+             self.sub_picker_frame = None
+
         self.master.configure(cursor="")
         self.gfx_canvas.configure(cursor="")
         self.master.unbind("<Button-1>")
@@ -487,14 +672,15 @@ class MappingTab:
         col_8x8 = int(x // (8 * scale))
         row_8x8 = int(y // (8 * scale))
         
-        # Snap to tile grid based on tile size
-        if tile_size == "8x16":
-            # Snap to 8x16 grid (vertical pairs)
-            row_8x8 = (row_8x8 // 2) * 2  # Round down to even row
-        elif tile_size == "16x16":
-            # Snap to 16x16 grid (2x2 blocks)
-            col_8x8 = (col_8x8 // 2) * 2  # Round down to even column
-            row_8x8 = (row_8x8 // 2) * 2  # Round down to even row
+        # Snap to tile grid based on tile size (ONLY IF NOT IN SUB-PICKER MODE)
+        if self.picker_sub_index is None:
+            if tile_size == "8x16":
+                # Snap to 8x16 grid (vertical pairs)
+                row_8x8 = (row_8x8 // 2) * 2
+            elif tile_size == "16x16":
+                # Snap to 16x16 grid (2x2 blocks)
+                col_8x8 = (col_8x8 // 2) * 2
+                row_8x8 = (row_8x8 // 2) * 2
         
         # Calculate base tile index (top-left 8x8 tile)
         tile_index = row_8x8 * self.width_in_tiles + col_8x8
@@ -509,6 +695,26 @@ class MappingTab:
         # Priority 1: Picker mode (if active)
         if self.picker_target:
             try:
+                # ADVANCED PICKER MODE (Sub-Picker)
+                if self.picker_sub_index is not None:
+                     # Update specific slot
+                     idx = self.picker_sub_index
+                     if 0 <= idx < len(self.picker_sub_vals):
+                          self.picker_sub_vals[idx] = final_id
+                     
+                     # Construct comma-string
+                     new_val = ",".join([f"{x:03X}" for x in self.picker_sub_vals])
+                     
+                     self.picker_target.delete(0, "end")
+                     self.picker_target.insert(0, new_val)
+                     self.picker_target.event_generate("<FocusOut>")
+                     
+                     # Do NOT cancel picker - allow picking next part
+                     # Maybe auto-advance? Let's keep it manual for now or user request.
+                     self.update_icons()
+                     return
+
+                # STANDARD PICKER MODE
                 self.picker_target.delete(0, "end")
                 self.picker_target.insert(0, hex_id)
                 self.picker_target.event_generate("<FocusOut>")
