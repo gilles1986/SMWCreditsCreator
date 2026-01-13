@@ -532,9 +532,17 @@ class MappingTab:
                      if c1: composite.paste(c1, (0, 0))
                      
                      if len(ids) >= 4:
+                         # Explicit 4 tiles
                          t2, t3, t4 = ids[1], ids[2], ids[3]
+                     elif len(ids) == 2:
+                         # Smart 2-Row Mode: top-row start, bottom-row start
+                         # TL=ids[0], TR=ids[0]+1
+                         # BL=ids[1], BR=ids[1]+1
+                         t2 = t1 + 1      # TR
+                         t3 = ids[1]      # BL
+                         t4 = ids[1] + 1  # BR
                      else:
-                         # Fallback standard
+                         # Fallback standard 16x16 block
                          t2, t3, t4 = t1+1, t1+0x10, t1+0x11
                      
                      c2 = get_crop(t2) # TR

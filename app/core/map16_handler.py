@@ -304,9 +304,23 @@ class Map16Generator:
                   parts = parse_ids(cid)
                   
                   t_tl = parts[0]
-                  t_tr = f"{int(t_tl, 16)+1:03X}" if len(parts) < 2 else parts[1]
-                  t_bl = f"{int(t_tl, 16)+0x10:03X}" if len(parts) < 3 else parts[2]
-                  t_br = f"{int(t_tl, 16)+0x11:03X}" if len(parts) < 4 else parts[3]
+                  if len(parts) >= 4:
+                       # Explicit 4 tiles
+                       t_tr = parts[1]
+                       t_bl = parts[2]
+                       t_br = parts[3]
+                  elif len(parts) == 2:
+                       # Smart 2-Row Mode: top-row start, bottom-row start
+                       # TL=p[0], TR=p[0]+1, BL=p[1], BR=p[1]+1
+                       t_tr = f"{int(t_tl, 16)+1:03X}"
+                       t_bl_val = parts[1]
+                       t_bl = t_bl_val
+                       t_br = f"{int(t_bl_val, 16)+1:03X}"
+                  else:
+                       # Fallback standard
+                       t_tr = f"{int(t_tl, 16)+1:03X}"
+                       t_bl = f"{int(t_tl, 16)+0x10:03X}"
+                       t_br = f"{int(t_tl, 16)+0x11:03X}"
                   
                   tile = Map16Tile(f"0000", self.act_as)
                   tile.sub_tiles[0].tile_id = fmt(t_tl)
