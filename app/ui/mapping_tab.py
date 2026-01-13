@@ -630,12 +630,66 @@ class MappingTab:
         self.full_pil_img = pil_img
         
         self.gfx_image_tk = ImageTk.PhotoImage(pil_img)
-        self.gfx_canvas.config(width=pil_img.width, height=pil_img.height)
-        self.gfx_canvas.create_image(0, 0, anchor="nw", image=self.gfx_image_tk)
         self.gfx_canvas.configure(scrollregion=(0, 0, pil_img.width, pil_img.height))
+        
+        # Bind events
+        self.gfx_canvas.bind("<Motion>", self.on_mouse_move)
+        self.gfx_canvas.bind("<Leave>", self.on_mouse_leave)
         
         self.draw_grid(pil_img.width, pil_img.height, scale)
         self.update_icons()  # Update character icons with loaded graphics
+
+    # ... (draw_grid code remains) ...
+
+    def on_mouse_move(self, event):
+        if not getattr(self, 'gfx_image_tk', None): return
+        
+        # Canvas coordinates logic to handle scrolling?
+        # Actually canvasx/canvasy handles scrolling offset!
+        x = self.gfx_canvas.canvasx(event.x)
+        y = self.gfx_canvas.canvasy(event.y)
+        scale = self.gfx_scale
+        
+        # Calculate Tile Index (8x8)
+        col = int(x // (8 * scale))
+        row = int(y // (8 * scale))
+        
+        # Check bounds
+        if col < 0 or row < 0 or col >= self.width_in_tiles or row * self.width_in_tiles >= (len(self.raw_pixels)//64):
+             self.gfx_canvas.delete("tooltip_bg")
+             self.gfx_canvas.delete("tooltip_text")
+             return
+
+        tile_index = row * self.width_in_tiles + col
+        
+        # Base Offset
+        slot = self.gfx_slot_var.get()
+        base_offset = 0x200 if slot == "BG2" else 0x280
+        final_id = base_offset + tile_index
+        hex_id = f"{final_id:03X}"
+        
+        # Draw Tooltip
+        self.gfx_canvas.delete("tooltip_bg")
+        self.gfx_canvas.delete("tooltip_text")
+        
+        # Position: "rechts über der Maus" (right above mouse)
+        # Mouse screen pos: x, y (canvas coords).
+        # Tooltip pos:
+        tip_x = x + 20
+        tip_y = y - 20
+        
+        # Create text to get bounding box
+        text_id = self.gfx_canvas.create_text(tip_x, tip_y, text=hex_id, fill="white", anchor="w", font=("Arial", 10, "bold"), tag="tooltip_text")
+        bbox = self.gfx_canvas.bbox(text_id)
+        
+        # Draw background behind text (with padding)
+        pad = 4
+        self.gfx_canvas.create_rectangle(bbox[0]-pad, bbox[1]-pad, bbox[2]+pad, bbox[3]+pad, fill="#2b2b2b", outline="#505050", tag="tooltip_bg")
+        self.gfx_canvas.tag_raise("tooltip_text") # Ensure text is on top
+
+    def on_mouse_leave(self, event):
+        self.gfx_canvas.delete("tooltip_bg")
+        self.gfx_canvas.delete("tooltip_text")
 
     def draw_grid(self, w, h, scale):
         tile_size = self.tile_size_var.get()
