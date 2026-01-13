@@ -519,7 +519,7 @@ class MappingTab:
                      if len(ids) >= 2:
                          t2 = ids[1]
                      else:
-                         t2 = t1 + 1 # Fallback standard
+                         t2 = t1 + 0x10 # Fallback standard (Vertical offset)
                      
                      crop2 = get_crop(t2)
                      if crop2: composite.paste(crop2, (0, px))

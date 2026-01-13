@@ -344,10 +344,10 @@ class Map16Generator:
                   p2 = parse_ids(c2)
                   
                   t_tl = p1[0]
-                  t_bl = f"{int(t_tl, 16)+1:03X}" if len(p1) < 2 else p1[1]
+                  t_bl = f"{int(t_tl, 16)+0x10:03X}" if len(p1) < 2 else p1[1]
 
                   t_tr = p2[0]
-                  t_br = f"{int(t_tr, 16)+1:03X}" if len(p2) < 2 else p2[1]
+                  t_br = f"{int(t_tr, 16)+0x10:03X}" if len(p2) < 2 else p2[1]
                   
                   tile = Map16Tile(f"0000", self.act_as)
                   tile.sub_tiles[0].tile_id = fmt(t_tl)
