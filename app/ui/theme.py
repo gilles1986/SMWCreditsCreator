@@ -17,6 +17,9 @@ class Theme:
     BTN_PRIMARY = "#1f6aa5"
     BTN_PRIMARY_TEXT = "white"
     
+    BTN_SECONDARY = "#606060"
+    BTN_INFO = "#3b8ed0"
+    
     BTN_WARNING = "#FF9800" # Better Orange
     BTN_WARNING_HOVER = "#F57C00" # Darker Orange for hover
     BTN_WARNING_TEXT = "#000000" # Black for contrast on orange
