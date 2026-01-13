@@ -32,7 +32,7 @@ print("Build complete. Copying external files...")
 dest_dir = 'dist' 
 
 # Files to copy
-files_to_copy = ['config.template.json', 'mapping.json', 'user_manual.html']
+files_to_copy = ['config.template.json', 'mapping.json', 'user_manual.html', 'palette.pal']
 
 for f in files_to_copy:
     if os.path.exists(f):

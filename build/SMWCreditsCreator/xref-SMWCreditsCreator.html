@@ -421,6 +421,8 @@ imported by:
  &#8226;   <a href="#PIL._version">PIL._version</a>
  &#8226;   <a href="#PIL._webp">PIL._webp</a>
  &#8226;   <a href="#PIL.features">PIL.features</a>
+ &#8226;   <a href="#app.core.snes_graphics">app.core.snes_graphics</a>
+ &#8226;   <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
  &#8226;   <a href="#customtkinter.windows.widgets.image.ctk_image">customtkinter.windows.widgets.image.ctk_image</a>
 
   </div>
@@ -1104,6 +1106,8 @@ imported by:
  &#8226;   <a href="#PIL.XbmImagePlugin">PIL.XbmImagePlugin</a>
  &#8226;   <a href="#PIL.XpmImagePlugin">PIL.XpmImagePlugin</a>
  &#8226;   <a href="#PIL.features">PIL.features</a>
+ &#8226;   <a href="#app.core.snes_graphics">app.core.snes_graphics</a>
+ &#8226;   <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
  &#8226;   <a href="#customtkinter.windows.widgets.image.ctk_image">customtkinter.windows.widgets.image.ctk_image</a>
 
   </div>
@@ -1496,6 +1500,7 @@ imports:
 imported by:
     <a href="#PIL">PIL</a>
  &#8226;   <a href="#PIL.SpiderImagePlugin">PIL.SpiderImagePlugin</a>
+ &#8226;   <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
  &#8226;   <a href="#customtkinter.windows.widgets.image.ctk_image">customtkinter.windows.widgets.image.ctk_image</a>
 
   </div>
@@ -3686,6 +3691,7 @@ imported by:
  &#8226;   <a href="#app.core.credits_parser">app.core.credits_parser</a>
  &#8226;   <a href="#app.core.map16_handler">app.core.map16_handler</a>
  &#8226;   <a href="#app.core.mapper">app.core.mapper</a>
+ &#8226;   <a href="#app.core.snes_graphics">app.core.snes_graphics</a>
  &#8226;   <a href="#app.core.validator">app.core.validator</a>
 
   </div>
@@ -3810,6 +3816,25 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="app.core.snes_graphics"></a>
+  <a target="code" href="///D:/dev/work/SMWCreditsCreator/app/core/snes_graphics.py" type="text/plain"><tt>app.core.snes_graphics</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#app.core">app.core</a>
+ &#8226;   <a href="#struct">struct</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="app.core.validator"></a>
   <a target="code" href="///D:/dev/work/SMWCreditsCreator/app/core/validator.py" type="text/plain"><tt>app.core.validator</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
@@ -3838,10 +3863,31 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#app.ui.credits_tab">app.ui.credits_tab</a>
+    <a href="#app.ui.bulk_editor">app.ui.bulk_editor</a>
+ &#8226;   <a href="#app.ui.credits_tab">app.ui.credits_tab</a>
  &#8226;   <a href="#app.ui.main_window">app.ui.main_window</a>
  &#8226;   <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
  &#8226;   <a href="#app.ui.theme">app.ui.theme</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="app.ui.bulk_editor"></a>
+  <a target="code" href="///D:/dev/work/SMWCreditsCreator/app/ui/bulk_editor.py" type="text/plain"><tt>app.ui.bulk_editor</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#app.ui">app.ui</a>
+ &#8226;   <a href="#app.ui.theme">app.ui.theme</a>
+ &#8226;   <a href="#customtkinter">customtkinter</a>
+ &#8226;   <a href="#tkinter">tkinter</a>
+ &#8226;   <a href="#tkinter.messagebox">tkinter.messagebox</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
 
   </div>
 
@@ -3864,6 +3910,7 @@ imports:
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#tkinter">tkinter</a>
  &#8226;   <a href="#tkinter.filedialog">tkinter.filedialog</a>
+ &#8226;   <a href="#tkinter.messagebox">tkinter.messagebox</a>
 
   </div>
   <div class="import">
@@ -3901,11 +3948,18 @@ imported by:
   <a target="code" href="///D:/dev/work/SMWCreditsCreator/app/ui/mapping_tab.py" type="text/plain"><tt>app.ui.mapping_tab</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#app.core.app_config">app.core.app_config</a>
+    <a href="#PIL">PIL</a>
+ &#8226;   <a href="#PIL.Image">PIL.Image</a>
+ &#8226;   <a href="#PIL.ImageTk">PIL.ImageTk</a>
+ &#8226;   <a href="#app.core.app_config">app.core.app_config</a>
  &#8226;   <a href="#app.core.mapper">app.core.mapper</a>
+ &#8226;   <a href="#app.core.snes_graphics">app.core.snes_graphics</a>
  &#8226;   <a href="#app.ui">app.ui</a>
+ &#8226;   <a href="#app.ui.bulk_editor">app.ui.bulk_editor</a>
  &#8226;   <a href="#app.ui.theme">app.ui.theme</a>
  &#8226;   <a href="#customtkinter">customtkinter</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#tkinter">tkinter</a>
  &#8226;   <a href="#tkinter.filedialog">tkinter.filedialog</a>
  &#8226;   <a href="#tkinter.messagebox">tkinter.messagebox</a>
@@ -3929,7 +3983,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#app.ui.credits_tab">app.ui.credits_tab</a>
+    <a href="#app.ui.bulk_editor">app.ui.bulk_editor</a>
+ &#8226;   <a href="#app.ui.credits_tab">app.ui.credits_tab</a>
  &#8226;   <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
 
   </div>
@@ -5740,7 +5795,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#app.ui.credits_tab">app.ui.credits_tab</a>
+    <a href="#app.ui.bulk_editor">app.ui.bulk_editor</a>
+ &#8226;   <a href="#app.ui.credits_tab">app.ui.credits_tab</a>
  &#8226;   <a href="#app.ui.main_window">app.ui.main_window</a>
  &#8226;   <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
  &#8226;   <a href="#customtkinter">customtkinter</a>
@@ -12177,6 +12233,7 @@ imported by:
  &#8226;   <a href="#app.core.validator">app.core.validator</a>
  &#8226;   <a href="#app.ui.credits_tab">app.ui.credits_tab</a>
  &#8226;   <a href="#app.ui.main_window">app.ui.main_window</a>
+ &#8226;   <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
  &#8226;   <a href="#argparse">argparse</a>
  &#8226;   <a href="#asyncio.base_events">asyncio.base_events</a>
  &#8226;   <a href="#asyncio.coroutines">asyncio.coroutines</a>
@@ -13234,6 +13291,7 @@ imported by:
  &#8226;   <a href="#PIL.SpiderImagePlugin">PIL.SpiderImagePlugin</a>
  &#8226;   <a href="#PIL.TiffImagePlugin">PIL.TiffImagePlugin</a>
  &#8226;   <a href="#PIL._binary">PIL._binary</a>
+ &#8226;   <a href="#app.core.snes_graphics">app.core.snes_graphics</a>
  &#8226;   <a href="#asyncio.windows_events">asyncio.windows_events</a>
  &#8226;   <a href="#base64">base64</a>
  &#8226;   <a href="#ctypes">ctypes</a>
@@ -13325,6 +13383,7 @@ imported by:
  &#8226;   <a href="#_collections_abc">_collections_abc</a>
  &#8226;   <a href="#_pydecimal">_pydecimal</a>
  &#8226;   <a href="#app.ui.main_window">app.ui.main_window</a>
+ &#8226;   <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
  &#8226;   <a href="#argparse">argparse</a>
  &#8226;   <a href="#ast">ast</a>
  &#8226;   <a href="#asyncio">asyncio</a>
@@ -13679,7 +13738,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#app.ui.credits_tab">app.ui.credits_tab</a>
+    <a href="#app.ui.bulk_editor">app.ui.bulk_editor</a>
+ &#8226;   <a href="#app.ui.credits_tab">app.ui.credits_tab</a>
  &#8226;   <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
  &#8226;   <a href="#customtkinter">customtkinter</a>
  &#8226;   <a href="#customtkinter.windows.ctk_tk">customtkinter.windows.ctk_tk</a>
@@ -13822,7 +13882,9 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
+    <a href="#app.ui.bulk_editor">app.ui.bulk_editor</a>
+ &#8226;   <a href="#app.ui.credits_tab">app.ui.credits_tab</a>
+ &#8226;   <a href="#app.ui.mapping_tab">app.ui.mapping_tab</a>
  &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#tkinter">tkinter</a>
  &#8226;   <a href="#tkinter.simpledialog">tkinter.simpledialog</a>

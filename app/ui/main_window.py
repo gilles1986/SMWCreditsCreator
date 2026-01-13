@@ -16,7 +16,7 @@ class MainWindow(ctk.CTk):
         
         logger.info("MainWindow: setting title/geometry")
         self.title(f"SMW Credits Creator v{VERSION} - by Saphros © 2026")
-        self.geometry("900x700")
+        self.geometry("940x700")
         
         # Create Tabs (2 tabs now: Credits and Mapping)
         logger.info("MainWindow: Creating Tabview")

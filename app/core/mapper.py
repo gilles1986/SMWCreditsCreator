@@ -11,6 +11,10 @@ class Mapper:
         
     def set_mapping(self, char, tile_id):
         self.mappings[char] = tile_id
+        
+    def delete_mapping(self, char):
+        if char in self.mappings:
+            del self.mappings[char]
 
     def get_mapping(self, char):
         return self.mappings.get(char, "")
@@ -67,13 +71,16 @@ class Mapper:
         # Sort uniqueness
         return sorted(list(set(chars + list(self.mappings.keys()))))
 
-    def apply_bulk_rules(self, rules_text):
+    def apply_bulk_rules(self, rules_text, clear_first=False):
         """
         Parses rules line by line.
         Syntax:
         - Range: A-Z = 280
         - Single: ! = 100
         """
+        if clear_first:
+             self.mappings.clear()
+             
         report = []
         lines = rules_text.split('\n')
         count = 0
@@ -91,11 +98,19 @@ class Mapper:
             key_part = parts[0].strip()
             val_part = parts[1].strip()
             
-            try:
-                start_tile = int(val_part, 16)
-            except ValueError:
-                report.append(f"Invalid hex value '{val_part}' in line: {line}")
-                continue
+            # Check for comma-separated value (e.g. "200, 202" for 16x16)
+            if ',' in val_part:
+                # Comma mode: Treat as string, do not increment.
+                # Only supports Single Character mapping effectively, or assigning SAME value to range.
+                is_comma = True
+                hex_str = val_part
+            else:
+                is_comma = False
+                try:
+                    start_tile = int(val_part, 16)
+                except ValueError:
+                    report.append(f"Invalid hex value '{val_part}' in line: {line}")
+                    continue
 
             # Check if Range
             if "-" in key_part and len(key_part) == 3: # Simple A-Z check
@@ -108,17 +123,25 @@ class Mapper:
                 s_code = ord(start_char)
                 e_code = ord(end_char)
                 
+                # Iterate range
+                curr_tile = 0 if is_comma else start_tile
+                # ord ranges works for ASCII.
+                s_code = ord(start_char)
+                e_code = ord(end_char)
+                
                 if s_code > e_code:
                      report.append(f"Invalid range {key_part} (Start > End)")
                      continue
                      
                 for code in range(s_code, e_code + 1):
                     char = chr(code)
-                    hex_str = f"{curr_tile:X}"
-                    self.mappings[char] = hex_str
-                    curr_tile += 1
+                    if is_comma:
+                        self.mappings[char] = hex_str
+                    else:
+                        self.mappings[char] = f"{curr_tile:X}"
+                        curr_tile += 1
                     count += 1
-                report.append(f"Applied range {key_part} starting at {val_part}")
+                report.append(f"Applied range {key_part} with value {val_part}")
                 
             # Check if Bracket Set: [ABC]
             elif key_part.startswith("[") and key_part.endswith("]"):
@@ -136,23 +159,27 @@ class Mapper:
                          chars_to_map.append(char)
                          i += 1
                 
-                curr_tile = start_tile
+                curr_tile = 0 if is_comma else start_tile
                 for char in chars_to_map:
-                    hex_str = f"{curr_tile:X}"
-                    self.mappings[char] = hex_str
-                    curr_tile += 1
+                    if is_comma:
+                         self.mappings[char] = hex_str
+                    else:
+                         self.mappings[char] = f"{curr_tile:X}"
+                         curr_tile += 1
                     count += 1
-                report.append(f"Mapped set {key_part} starting at {val_part}")
+                report.append(f"Mapped set {key_part} with value {val_part}")
 
             else:
                 # Single char (or maybe complex string key?)
                 # User asked for "eigene Sonderzeichen".
                 if len(key_part) == 1:
                     char = key_part
-                    hex_str = f"{start_tile:X}"
-                    self.mappings[char] = hex_str
+                    if is_comma:
+                         self.mappings[char] = hex_str
+                    else:
+                         self.mappings[char] = f"{start_tile:X}"
                     count += 1
-                    report.append(f"Mapped {char} = {hex_str}")
+                    report.append(f"Mapped {char} = {self.mappings[char]}")
                 else:
                     report.append(f"Skipped complex key '{key_part}' (only single chars or A-Z ranges supported for now)")
 

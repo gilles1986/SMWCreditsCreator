@@ -294,32 +294,42 @@ class MappingTab:
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
             
+        self.entries = {}
+        self.icon_labels = {}
+            
         # Get characters from mapper
         chars = self.mapper.get_default_characters() 
         for i, char in enumerate(chars):
+            # Styling constants
+            ROW_PADY = 8
+            LABEL_FONT = ("Arial", 20, "bold")
+            ENTRY_FONT = ("Arial", 14, "bold")
+            
             # Column 0: Label
             lbl_text = f"'{char}'" if char != ' ' else "'Space'"
-            lbl = ctk.CTkLabel(self.scroll_frame, text=lbl_text, width=40, font=Theme.FONT_BOLD)
-            lbl.grid(row=i, column=0, padx=5, pady=2, sticky="e")
+            lbl = ctk.CTkLabel(self.scroll_frame, text=lbl_text, width=50, font=LABEL_FONT)
+            lbl.grid(row=i, column=0, padx=(10, 5), pady=ROW_PADY, sticky="e")
             
             # Column 1: Entry
-            entry = ctk.CTkEntry(self.scroll_frame, placeholder_text="Hex", width=60)
-            entry.grid(row=i, column=1, padx=5, pady=2, sticky="w")
+            entry = ctk.CTkEntry(self.scroll_frame, placeholder_text="Hex", width=80, 
+                                 font=ENTRY_FONT, justify="center")
+            entry.grid(row=i, column=1, padx=5, pady=ROW_PADY, sticky="w")
             
             # Column 2: Picker Button (skip for Space)
             if char != ' ':
-                picker_btn = ctk.CTkButton(self.scroll_frame, text="🎯", width=28, height=28,
-                                           font=("Arial", 14),
+                picker_btn = ctk.CTkButton(self.scroll_frame, text="🎯", width=32, height=32,
+                                           font=("Arial", 16),
                                            fg_color=Theme.BTN_PRIMARY,
                                            hover_color=Theme.BTN_PRIMARY,
                                            command=lambda e=entry: self.activate_picker(e))
-                picker_btn.grid(row=i, column=2, padx=2, pady=2)
+                picker_btn.grid(row=i, column=2, padx=5, pady=ROW_PADY)
             
             # Column 3: Icon (Visual Feedback)
             # Skip icon for Space
             if char != ' ':
-                icon = ctk.CTkLabel(self.scroll_frame, text="", width=26, height=26)
-                icon.grid(row=i, column=3, padx=5, pady=2, sticky="w")
+                # 64x64 to allow space for 16x16 tiles at 4x zoom
+                icon = ctk.CTkLabel(self.scroll_frame, text="", width=64, height=64) 
+                icon.grid(row=i, column=3, padx=10, pady=ROW_PADY, sticky="w")
                 self.icon_labels[char] = icon
 
             val = self.mapper.get_mapping(char)

@@ -247,7 +247,29 @@ class CreditsTab:
         self.ent_start_page.insert(0, f"{start_page_def:02X}")
         self.ent_start_page.bind("<FocusOut>", lambda _: self.save_config())
         
-        # ... (rest of method) ...
+        # 3. Actions & Log
+        action_frame = ctk.CTkFrame(self.view_container)
+        action_frame.pack(fill="both", expand=True, pady=10)
+        
+        self.btn_generate = ctk.CTkButton(action_frame, text="GENERATE CREDITS", 
+                                          command=self.generate, 
+                                          height=40, font=('Arial', 14, 'bold'),
+                                          fg_color=Theme.BTN_SUCCESS,
+                                          hover_color=Theme.BTN_SUCCESS_HOVER if hasattr(Theme, 'BTN_SUCCESS_HOVER') else None)
+        self.btn_generate.pack(fill="x", padx=20, pady=20)
+        
+        # Log Pane
+        ctk.CTkLabel(action_frame, text="Output Log:", text_color=Theme.TEXT_DIM, font=("Arial", 11)).pack(anchor="w", padx=20, pady=(0, 5))
+        
+        self.txt_log = ctk.CTkTextbox(action_frame, 
+                                      text_color=Theme.TEXT_NORMAL, 
+                                      fg_color=Theme.BG_COLOR_2,
+                                      corner_radius=6,
+                                      padx=10, pady=10,
+                                      font=("Consolas", 12))
+        self.txt_log.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        self.txt_log.insert("0.0", "\n".join(self.log_history))
+        self.txt_log.configure(state="disabled") # Read-only but selectable
 
     # ... (rest) ...
 
@@ -274,9 +296,13 @@ class CreditsTab:
 
     def log(self, message):
         # Helper to log safely even if view changed (though usually log is in main view)
-        if hasattr(self, 'lbl_log') and self.lbl_log.winfo_exists():
-            current = self.lbl_log.cget("text")
-            self.lbl_log.configure(text=current + "\n" + message)
+        self.log_history.append(message)
+        
+        if hasattr(self, 'txt_log') and self.txt_log.winfo_exists():
+            self.txt_log.configure(state="normal")
+            self.txt_log.insert("end", message + "\n")
+            self.txt_log.see("end")
+            self.txt_log.configure(state="disabled")
         else:
             print(f"[LOG] {message}")
 

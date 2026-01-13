@@ -23,6 +23,10 @@ class Theme:
     BTN_WARNING = "#FF9800" # Better Orange
     BTN_WARNING_HOVER = "#F57C00" # Darker Orange for hover
     BTN_WARNING_TEXT = "#000000" # Black for contrast on orange
+    
+    BTN_DANGER = "#C62828" # Red for Danger/Delete
+    BTN_SUCCESS = "#158c56" # Darker Green for Success/Generate
+    BTN_SUCCESS_HOVER = "#106e42" # Even darker for hover
 
     # Backgrounds
     BG_COLOR_2 = "#333333" # Lighter background for headers/bars

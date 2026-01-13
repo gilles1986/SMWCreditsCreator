@@ -12,7 +12,7 @@ class BulkEditorWindow(ctk.CTkToplevel):
         
         # Make modal-ish
         self.transient(parent) 
-        self.grab_set() 
+        # self.grab_set() # Disabled to allow checking tooltips in main window 
         
         self.lbl_title = ctk.CTkLabel(self, text="Bulk Rules", font=Theme.FONT_BOLD)
         self.lbl_title.pack(pady=10)
@@ -35,7 +35,11 @@ a-z = 2B0
         
         # Buttons
         curr_frame = ctk.CTkFrame(self, fg_color="transparent")
-        curr_frame.pack(fill="x", pady=10, padx=10)
+        curr_frame.pack(fill="x", pady=5, padx=10)
+        
+        self.var_clear = ctk.BooleanVar(value=False)
+        self.chk_clear = ctk.CTkCheckBox(self, text="Clear existing mappings first", variable=self.var_clear)
+        self.chk_clear.pack(pady=(0, 10))
         
         ctk.CTkButton(curr_frame, text="?", width=40, command=self.show_help).pack(side="left")
         ctk.CTkButton(curr_frame, text="Apply Rules", command=self.apply_bulk).pack(side="left", padx=10, fill="x", expand=True)
@@ -66,7 +70,8 @@ Note: All tile IDs are in Hexadecimal.
 
     def apply_bulk(self):
         rules = self.txt_bulk.get("1.0", "end")
-        success, msg = self.mapper.apply_bulk_rules(rules)
+        clear_val = self.var_clear.get()
+        success, msg = self.mapper.apply_bulk_rules(rules, clear_first=clear_val)
         if success:
             if self.on_apply_callback:
                 self.on_apply_callback()
