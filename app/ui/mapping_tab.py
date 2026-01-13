@@ -31,7 +31,7 @@ class MappingTab:
         char_map_container = ctk.CTkFrame(self.master, fg_color="transparent")
         char_map_container.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
         
-        # Header with info icon
+        # Header with info icon and converter button
         header_frame = ctk.CTkFrame(char_map_container, fg_color="transparent")
         header_frame.pack(fill="x", pady=(0, 5))
         
@@ -43,6 +43,13 @@ class MappingTab:
                                  hover_color=Theme.BTN_PRIMARY,
                                  command=self.show_character_map_help)
         info_btn.pack(side="left", padx=5)
+        
+        # Converter button (dynamic)
+        self.btn_converter = ctk.CTkButton(header_frame, text="⇄ BG3", width=70, height=24,
+                                          font=("Arial", 12, "bold"),
+                                          fg_color=Theme.BTN_INFO,
+                                          command=self.convert_mappings)
+        self.btn_converter.pack(side="right", padx=5)
         
         self.scroll_frame = ctk.CTkScrollableFrame(char_map_container, width=290)
         self.scroll_frame.pack(fill="both", expand=True)
@@ -156,6 +163,73 @@ class MappingTab:
         )
         messagebox.showinfo("Character Map Help", help_text)
 
+    def detect_current_bg(self):
+        """Detect current BG slot based on 'A' character mapping"""
+        a_mapping = self.mapper.get_mapping('A')
+        if not a_mapping:
+            return None
+        
+        try:
+            tile_id = int(a_mapping, 16)
+            if 0x200 <= tile_id <= 0x27F:
+                return "BG2"
+            elif 0x280 <= tile_id <= 0x2FF:
+                return "BG3"
+        except:
+            pass
+        return None
+    
+    def update_converter_button(self):
+        """Update converter button text based on current BG"""
+        current_bg = self.detect_current_bg()
+        if current_bg == "BG2":
+            self.btn_converter.configure(text="⇄ BG3")
+        elif current_bg == "BG3":
+            self.btn_converter.configure(text="⇄ BG2")
+        else:
+            self.btn_converter.configure(text="—", state="disabled")
+            return
+        self.btn_converter.configure(state="normal")
+    
+    def convert_mappings(self):
+        """Convert all mappings between BG2 and BG3"""
+        current_bg = self.detect_current_bg()
+        if not current_bg:
+            from tkinter import messagebox
+            messagebox.showwarning("Conversion Error", "Cannot detect current BG slot from 'A' mapping.")
+            return
+        
+        # Determine offset and target
+        if current_bg == "BG2":
+            offset = 0x80  # BG2 -> BG3 (+0x80)
+            target_bg = "BG3"
+        else:
+            offset = -0x80  # BG3 -> BG2 (-0x80)
+            target_bg = "BG2"
+        
+        # Convert all mappings
+        converted_count = 0
+        for char, entry in self.entries.items():
+            val = entry.get().strip()
+            if val:
+                try:
+                    tile_id = int(val, 16)
+                    new_id = tile_id + offset
+                    new_hex = f"{new_id:03X}"
+                    entry.delete(0, "end")
+                    entry.insert(0, new_hex)
+                    self.mapper.set_mapping(char, new_hex)
+                    converted_count += 1
+                except:
+                    pass
+        
+        # Switch GFX Slot
+        self.gfx_slot_var.set(target_bg)
+        
+        # Update icons and button
+        self.update_icons()
+        self.update_converter_button()
+
     def save_settings(self, _=None):
         self.config.set("tile_size", self.tile_size_var.get())
         
@@ -181,12 +255,13 @@ class MappingTab:
             entry = ctk.CTkEntry(self.scroll_frame, placeholder_text="Hex", width=60)
             entry.grid(row=i, column=1, padx=5, pady=2, sticky="w")
             
-            # Column 2: Picker Button
-            picker_btn = ctk.CTkButton(self.scroll_frame, text="🎯", width=28, height=28,
-                                       font=("Arial", 14),
-                                       fg_color=Theme.BTN_PRIMARY,
-                                       command=lambda e=entry: self.activate_picker(e))
-            picker_btn.grid(row=i, column=2, padx=2, pady=2)
+            # Column 2: Picker Button (skip for Space)
+            if char != ' ':
+                picker_btn = ctk.CTkButton(self.scroll_frame, text="🎯", width=28, height=28,
+                                           font=("Arial", 14),
+                                           fg_color=Theme.BTN_PRIMARY,
+                                           command=lambda e=entry: self.activate_picker(e))
+                picker_btn.grid(row=i, column=2, padx=2, pady=2)
             
             # Column 3: Icon (Visual Feedback)
             icon = ctk.CTkLabel(self.scroll_frame, text="", width=26, height=26)
@@ -194,14 +269,29 @@ class MappingTab:
             self.icon_labels[char] = icon
 
             val = self.mapper.get_mapping(char)
+            
+            # Set default for Space if not present
+            if char == ' ' and not val:
+                val = "00F8"
+                self.mapper.set_mapping(char, val)
+            
             if val:
-                entry.insert(0, val) 
-            entry.bind("<FocusOut>", lambda event, c=char, e=entry: self.update_mapping(c, e))
+                entry.insert(0, val)
+            
+            # Disable Space character input
+            if char == ' ':
+                entry.configure(state="disabled")
+            else:
+                entry.bind("<FocusOut>", lambda event, c=char, e=entry: self.update_mapping(c, e))
+            
             self.entries[char] = entry
             
         # Update icons if graphics loaded
         if self.raw_pixels:
             self.update_icons()
+        
+        # Update converter button based on current mappings
+        self.update_converter_button()
     
     def activate_picker(self, target_entry):
         """Activate picker mode for selecting a tile from the canvas"""
