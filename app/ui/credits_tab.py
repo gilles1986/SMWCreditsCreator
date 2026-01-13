@@ -51,8 +51,74 @@ class CreditsTab:
             self.load_project(last_proj)
         else:
             self.show_view_no_project()
+    # --- Project Management ---
 
-    # --- Views ---
+    def browse_project(self):
+        # Open directory dialog
+        folder = filedialog.askdirectory(title="Select Project Folder")
+        if folder:
+            self.load_project(folder)
+
+    def load_project(self, path):
+        # 1. Detect Version
+        version = self.detect_version(path)
+        if not version:
+             self.show_view_invalid_project("Could not detect a valid RHR or Callisto project structure.\n(Expected 'buildtool' or 'tools/Callisto' folder)")
+             return
+
+        self.project_path = path
+        self.rhr_version = version
+
+        # 2. Check Config
+        ok, msg = ConfigManager.check_exports_toml(path, version)
+        if not ok:
+             self.show_view_setup_needed(msg)
+             return
+
+        # 3. Success
+        self.config.set("last_project", path)
+        self.lbl_proj_path.configure(text=path)
+        self.btn_change.configure(text="Change")
+        self.btn_unload.configure(state="normal")
+        
+        self.show_view_main()
+        self.log(f"Project loaded: {path} (v{version[0]}.{version[1]})")
+
+    def detect_version(self, path):
+        # Check high version first
+        if os.path.exists(os.path.join(path, "tools", "Callisto", "callisto.exe")):
+             return (5, 13) # or newer
+        elif os.path.exists(os.path.join(path, "buildtool", "callisto.exe")):
+             return (5, 10)
+        elif os.path.exists(os.path.join(path, "buildtool", "project.toml")):
+             # Old RHR
+             return (5, 0)
+        return None
+
+    def unload_project(self):
+        self.project_path = None
+        self.rhr_version = None
+        self.config.set("last_project", "")
+        self.lbl_proj_path.configure(text="No Project Selected")
+        self.btn_change.configure(text="Change Folder")
+        self.btn_unload.configure(state="disabled")
+        self.show_view_no_project()
+        
+    def fix_config(self):
+        if not self.project_path or not self.rhr_version:
+             return
+        
+        ok, msg = ConfigManager.fix_exports_toml(self.project_path, self.rhr_version)
+        if ok:
+             self.log("Configuration fixed.")
+             self.load_project(self.project_path) # Reload
+        else:
+             from tkinter import messagebox
+             messagebox.showerror("Error", f"Failed to fix config: {msg}")
+
+    def clear_view(self):
+        for widget in self.view_container.winfo_children():
+            widget.destroy()
 
     def show_view_no_project(self):
         self.clear_view()

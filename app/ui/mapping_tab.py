@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import os
 from tkinter import filedialog
 from app.core.mapper import Mapper
 from app.ui.theme import Theme
@@ -125,16 +126,23 @@ class MappingTab:
         self.btn_load_gfx = ctk.CTkButton(gfx_header, text="Load Graphics (.bin)", width=120, command=self.load_graphics)
         self.btn_load_gfx.pack(side="right", padx=5)
 
-        # Scrollable Canvas area
-        self.gfx_scroll = ctk.CTkScrollableFrame(self.gfx_frame_container, label_text="Preview")
-        self.gfx_scroll.pack(fill="both", expand=True, padx=5, pady=5)
+        # Static Canvas area (Fixed size 128x64 * 3)
+        self.gfx_frame = ctk.CTkFrame(self.gfx_frame_container, fg_color="transparent")
+        # Increased pady from 5 to (15, 5) for top spacing
+        self.gfx_frame.pack(fill="none", expand=False, padx=5, pady=(15, 5), anchor="nw")
         
-        self.gfx_canvas = ctk.CTkCanvas(self.gfx_scroll, bg="#202020", highlightthickness=0, width=256, height=256)
-        self.gfx_canvas.pack(anchor="nw", expand=True, fill="both")
+        # Dimensions: 128x64 * 3 = 384x192
+        self.width_in_tiles = 16
+        self.gfx_scale = 4
+        
+        # Initial size placeholder
+        w = 128 * self.gfx_scale
+        h = 64 * self.gfx_scale
+        
+        self.gfx_canvas = ctk.CTkCanvas(self.gfx_frame, bg="#202020", highlightthickness=0, width=w, height=h)
+        self.gfx_canvas.pack(fill="both", expand=True) # Canvas fills the fixed frame
         self.gfx_canvas.bind("<Button-1>", self.on_grid_click) # Left click
         
-        self.width_in_tiles = 16
-        self.gfx_scale = 3
         self.loaded_palette = None # List of (r,g,b)
         self.raw_pixels = None # Store raw pixels (0-15)
 
@@ -148,9 +156,44 @@ class MappingTab:
         success, msg = self.mapper.load_default_mappings()
         if not success:
             print(f"Auto-load failed: {msg}") 
+            
+        # Try to load default palette
+        self.load_default_palette()
         
         self.populate_grid()
-        
+
+    def load_default_palette(self):
+        """Attempts to load 'palette.pal' from the application root."""
+        try:
+            # Check for palette.pal in typical locations (CWD or sys._MEIPASS equivalent)
+            # Assuming CWD for dev, and relative for build
+            possible_paths = [
+                "palette.pal",
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "palette.pal") # If we are in app/ui/
+            ]
+            
+            # Since main.py sets CWD usually, 'palette.pal' should be enough, but let's be safe
+            import sys
+            base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
+            possible_paths.insert(0, os.path.join(base_path, "palette.pal"))
+            
+            found_path = None
+            for p in possible_paths:
+                if os.path.exists(p):
+                    found_path = p
+                    break
+            
+            if found_path:
+                with open(found_path, "rb") as f:
+                     data = f.read()
+                self.loaded_palette = SNESGraphics.decode_palette(data)
+                print(f"[LOG] Loaded default palette from {found_path}")
+            else:
+                print("[LOG] Default 'palette.pal' not found, using fallback.")
+                
+        except Exception as e:
+            print(f"[ERROR] Failed to load default palette: {e}")
+
     def open_bulk_editor(self):
         BulkEditorWindow(self.master, self.mapper, self.populate_grid)
 
@@ -268,13 +311,16 @@ class MappingTab:
                 picker_btn = ctk.CTkButton(self.scroll_frame, text="🎯", width=28, height=28,
                                            font=("Arial", 14),
                                            fg_color=Theme.BTN_PRIMARY,
+                                           hover_color=Theme.BTN_PRIMARY,
                                            command=lambda e=entry: self.activate_picker(e))
                 picker_btn.grid(row=i, column=2, padx=2, pady=2)
             
             # Column 3: Icon (Visual Feedback)
-            icon = ctk.CTkLabel(self.scroll_frame, text="", width=26, height=26)
-            icon.grid(row=i, column=3, padx=5, pady=2, sticky="w")
-            self.icon_labels[char] = icon
+            # Skip icon for Space
+            if char != ' ':
+                icon = ctk.CTkLabel(self.scroll_frame, text="", width=26, height=26)
+                icon.grid(row=i, column=3, padx=5, pady=2, sticky="w")
+                self.icon_labels[char] = icon
 
             val = self.mapper.get_mapping(char)
             
@@ -459,6 +505,10 @@ class MappingTab:
         w_tiles = self.width_in_tiles
 
         for char, entry in self.entries.items():
+             # Skip Space
+             if char == ' ': continue
+             if char not in self.icon_labels: continue
+
              val = entry.get().strip()
              if not val:
                  self.icon_labels[char].configure(image=None)
@@ -626,17 +676,24 @@ class MappingTab:
         pil_img = SNESGraphics.create_image(self.raw_pixels, self.width_in_tiles, palette=current_pal)
         
         scale = self.gfx_scale
-        pil_img = pil_img.resize((pil_img.width * scale, pil_img.height * scale), Image.NEAREST)
+        scaled_w = pil_img.width * scale
+        scaled_h = pil_img.height * scale
+        
+        pil_img = pil_img.resize((scaled_w, scaled_h), Image.NEAREST)
         self.full_pil_img = pil_img
         
         self.gfx_image_tk = ImageTk.PhotoImage(pil_img)
-        self.gfx_canvas.configure(scrollregion=(0, 0, pil_img.width, pil_img.height))
+        self.gfx_canvas.configure(width=scaled_w, height=scaled_h, scrollregion=(0, 0, scaled_w, scaled_h))
         
+        # Draw Image
+        self.gfx_canvas.delete("all")
+        self.gfx_canvas.create_image(0, 0, anchor="nw", image=self.gfx_image_tk)
+
         # Bind events
         self.gfx_canvas.bind("<Motion>", self.on_mouse_move)
         self.gfx_canvas.bind("<Leave>", self.on_mouse_leave)
         
-        self.draw_grid(pil_img.width, pil_img.height, scale)
+        self.draw_grid(scaled_w, scaled_h, scale)
         self.update_icons()  # Update character icons with loaded graphics
 
     # ... (draw_grid code remains) ...
@@ -677,6 +734,10 @@ class MappingTab:
         # Tooltip pos:
         tip_x = x + 20
         tip_y = y - 20
+        
+        # Smart Positioning (Clip Top)
+        if tip_y < 10:
+             tip_y = y + 30
         
         # Create text to get bounding box
         text_id = self.gfx_canvas.create_text(tip_x, tip_y, text=hex_id, fill="white", anchor="w", font=("Arial", 10, "bold"), tag="tooltip_text")
