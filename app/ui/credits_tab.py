@@ -132,7 +132,7 @@ class CreditsTab:
         opt_def = self.config.get("optimize_columns", True)
         empty_def = self.config.get("add_empty_line", False)
         blank_def = self.config.get("blank_tile_id", "0F8")
-        font_size_def = self.config.get("font_size", "8x8")
+        font_size_def = self.config.get("tile_size", "8x8") # Use tile_size
 
         self.chk_optimize_var = ctk.BooleanVar(value=opt_def)
         ctk.CTkCheckBox(opt_grid, text="Optimize Columns (2 Names/Row)", variable=self.chk_optimize_var, command=self.save_config).grid(row=0, column=0, sticky="w", padx=10, pady=5)
@@ -151,7 +151,7 @@ class CreditsTab:
         
         ctk.CTkLabel(blank_row, text="Font Size:").pack(side="left", padx=(15, 5))
         self.font_size_var = ctk.StringVar(value=font_size_def)
-        self.opt_font_size = ctk.CTkOptionMenu(blank_row, variable=self.font_size_var, values=["8x8", "16x16"], command=lambda _: self.save_config(), width=80)
+        self.opt_font_size = ctk.CTkOptionMenu(blank_row, variable=self.font_size_var, values=["8x8", "8x16", "16x16"], command=lambda _: self.save_config(), width=80)
         self.opt_font_size.pack(side="left", padx=5)
         
         # Map16 Settings Row
@@ -180,96 +180,16 @@ class CreditsTab:
         self.ent_start_page.pack(side="left", padx=5)
         self.ent_start_page.insert(0, f"{start_page_def:02X}")
         self.ent_start_page.bind("<FocusOut>", lambda _: self.save_config())
-
-        # 3. Action & Log
-        action_frame = ctk.CTkFrame(self.view_container, fg_color="transparent")
-        action_frame.pack(fill="both", expand=True, pady=10)
         
-        self.btn_generate = ctk.CTkButton(action_frame, text="Generate Map16", command=self.generate, height=40, font=Theme.FONT_BOLD, fg_color=Theme.BTN_PRIMARY, text_color=Theme.BTN_PRIMARY_TEXT)
-        self.btn_generate.pack(fill="x", pady=10)
-        
-        self.log_frame = ctk.CTkScrollableFrame(action_frame, label_text="Generation Log")
-        self.log_frame.pack(fill="both", expand=True)
-        
-        log_text = "\n".join(self.log_history) if self.log_history else "Ready."
-        self.lbl_log = ctk.CTkLabel(self.log_frame, text=log_text, justify="left", anchor="w")
-        self.lbl_log.pack(fill="x", padx=5, pady=5)
+        # ... (rest of method) ...
 
+    # ... (rest) ...
 
-    def clear_view(self):
-        for widget in self.view_container.winfo_children():
-            widget.destroy()
-
-    # --- Logic ---
-
-    def browse_project(self):
-        folder = filedialog.askdirectory()
-        if folder:
-            self.load_project(folder)
-
-    def load_project(self, folder):
-        self.project_path = folder
-        # Update Bar
-        self.lbl_proj_path.configure(text=folder, text_color=Theme.TEXT_NORMAL)
-        self.btn_change.configure(text="Change Folder") # Update text if it was "Select"
-        self.btn_unload.configure(state="normal")
-        
-        self.config.set("last_project", folder)
-        
-        # Validate
-        is_valid, message = Validator.validate_folder(folder)
-        if not is_valid:
-            self.rhr_version = None
-            self.show_view_invalid_project(message)
-            return
-
-        self.rhr_version = Validator.get_rhr_version(folder)
-        
-        # Update Display with Version
-        if self.rhr_version:
-             v_str = f"{self.rhr_version[0]}.{self.rhr_version[1]}"
-             self.lbl_proj_path.configure(text=f"{folder} (RHR v{v_str})")
-        
-        # Check Config
-        is_text_format, check_msg = ConfigManager.check_exports_toml(folder, self.rhr_version)
-        
-        if is_text_format:
-            self.show_view_main()
-        else:
-            self.show_view_setup_needed(check_msg)
-
-    def unload_project(self):
-        self.project_path = None
-        self.rhr_version = None
-        self.lbl_proj_path.configure(text="No Project Selected", text_color=Theme.TEXT_DIM)
-        self.btn_unload.configure(state="disabled")
-        self.show_view_no_project()
-
-    def fix_config(self):
-        if not self.project_path or not self.rhr_version:
-            return
-        
-        from app.core.callisto_handler import CallistoHandler
-
-        success, msg = ConfigManager.fix_exports_toml(self.project_path, self.rhr_version)
-        if success:
-            self.log(f"Config fixed: {msg}")
-            
-            # Run callisto save to export map16
-            self.log("Running 'callisto save' to initial export...")
-            ok, cmd_msg = CallistoHandler.save(self.project_path, self.rhr_version)
-            if ok:
-                 self.log(f"Success: {cmd_msg}")
-            else:
-                 self.log(f"Warning: {cmd_msg}")
-            
-            self.load_project(self.project_path)
-            
     def save_config(self):
         self.config.set("optimize_columns", self.chk_optimize_var.get())
         self.config.set("add_empty_line", self.chk_empty_var.get())
         self.config.set("blank_tile_id", self.ent_blank.get())
-        self.config.set("font_size", self.font_size_var.get())
+        self.config.set("tile_size", self.font_size_var.get()) # Save as tile_size
         # Map16 Settings
         self.config.set("act_as", self.act_as_var.get())
         self.config.set("priority", self.priority_var.get())
