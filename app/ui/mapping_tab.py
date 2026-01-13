@@ -20,15 +20,32 @@ class MappingTab:
         self.start_page = self.config.get("start_page", 0x60)
         self.tile_size = self.config.get("tile_size", "8x8")
         
-        # Grid layout (2 Columns)
-        self.master.grid_columnconfigure(0, weight=0, minsize=250) # Col 1: Character Map
+        # Grid layout (2 Columns) - Increased Col 1 Width (approx 300px)
+        self.master.grid_columnconfigure(0, weight=0, minsize=320) # Col 1: Character Map
         self.master.grid_columnconfigure(1, weight=1) # Col 2: Settings + Graphics
         self.master.grid_columnconfigure(2, weight=0) # Remove Col 3
         self.master.grid_rowconfigure(0, weight=1)
         
+        
         # --- Column 1: Character Map ---
-        self.scroll_frame = ctk.CTkScrollableFrame(self.master, label_text="Character Map (Tile IDs)", width=220)
-        self.scroll_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        char_map_container = ctk.CTkFrame(self.master, fg_color="transparent")
+        char_map_container.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        
+        # Header with info icon
+        header_frame = ctk.CTkFrame(char_map_container, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 5))
+        
+        ctk.CTkLabel(header_frame, text="Character Map (Tile IDs)", font=Theme.FONT_BOLD).pack(side="left")
+        
+        info_btn = ctk.CTkButton(header_frame, text="ℹ", width=24, height=24, 
+                                 font=("Arial", 14, "bold"), 
+                                 fg_color="transparent", 
+                                 hover_color=Theme.BTN_PRIMARY,
+                                 command=self.show_character_map_help)
+        info_btn.pack(side="left", padx=5)
+        
+        self.scroll_frame = ctk.CTkScrollableFrame(char_map_container, width=290)
+        self.scroll_frame.pack(fill="both", expand=True)
 
         # --- Column 2: Configuration & Graphics (Compact) ---
         self.middle_frame = ctk.CTkFrame(self.master, fg_color="transparent")
@@ -92,12 +109,12 @@ class MappingTab:
         action_frame = ctk.CTkFrame(self.config_frame, fg_color="transparent")
         action_frame.grid(row=4, column=0, columnspan=2, sticky="ew", pady=10)
         
-        ctk.CTkButton(action_frame, text="Load JSON", width=80, command=self.load_mapping).pack(side="left", padx=5, expand=True, fill="x")
-        ctk.CTkButton(action_frame, text="Save JSON", width=80, command=self.save_mapping).pack(side="left", padx=5, expand=True, fill="x")
+        ctk.CTkButton(action_frame, text="Load Mapping", width=80, command=self.load_mapping).pack(side="left", padx=5, expand=True, fill="x")
+        ctk.CTkButton(action_frame, text="Save Mapping", width=80, command=self.save_mapping).pack(side="left", padx=5, expand=True, fill="x")
         ctk.CTkButton(action_frame, text="Bulk Editor", width=100, fg_color=Theme.BTN_SECONDARY, command=self.open_bulk_editor).pack(side="left", padx=5, expand=True, fill="x")
 
 
-        # 2. Graphics Section (New)
+        # 2. Graphics Section
         self.gfx_frame_container = ctk.CTkFrame(self.middle_frame)
         self.gfx_frame_container.grid(row=1, column=0, sticky="nsew")
         
@@ -107,10 +124,11 @@ class MappingTab:
         
         ctk.CTkLabel(gfx_header, text="Graphics (4BPP)", font=Theme.FONT_BOLD).pack(side="left")
         
-        ctk.CTkLabel(gfx_header, text="Offset (Hex):", font=("Arial", 11)).pack(side="left", padx=(10, 5))
-        self.ent_gfx_offset = ctk.CTkEntry(gfx_header, width=50, height=24)
-        self.ent_gfx_offset.insert(0, "0")
-        self.ent_gfx_offset.pack(side="left")
+        # GFX Slot Dropdown (BG2/BG3)
+        ctk.CTkLabel(gfx_header, text="GFX Slot:", font=("Arial", 11)).pack(side="left", padx=(10, 5))
+        self.gfx_slot_var = ctk.StringVar(value="BG3")
+        self.opt_gfx_slot = ctk.CTkOptionMenu(gfx_header, variable=self.gfx_slot_var, values=["BG2", "BG3"], width=70, command=self.refresh_graphics)
+        self.opt_gfx_slot.pack(side="left")
         
         self.btn_load_pal = ctk.CTkButton(gfx_header, text="Load Palette (.bin)", width=120, command=self.load_palette, fg_color=Theme.BTN_INFO)
         self.btn_load_pal.pack(side="right", padx=5)
@@ -132,6 +150,8 @@ class MappingTab:
         self.raw_pixels = None # Store raw pixels (0-15)
 
         self.entries = {}
+        self.icon_labels = {} 
+        
         # Auto-load default
         success, msg = self.mapper.load_default_mappings()
         if not success:
@@ -141,6 +161,17 @@ class MappingTab:
         
     def open_bulk_editor(self):
         BulkEditorWindow(self.master, self.mapper, self.populate_grid)
+
+    def show_character_map_help(self):
+        from tkinter import messagebox
+        help_text = (
+            "Adding Custom Mappings:\n\n"
+            "1. Bulk Editor: Use the 'Bulk Editor' button to map multiple characters at once.\n"
+            "   Example: A-Z = 280\n\n"
+            "2. mapping.json: Edit the mapping.json file directly and load it via 'Load Mapping'.\n"
+            "   The file contains all character-to-tile assignments."
+        )
+        messagebox.showinfo("Character Map Help", help_text)
 
     def save_settings(self, _=None):
         self.config.set("act_as", self.act_as_var.get())
@@ -167,21 +198,67 @@ class MappingTab:
         # Get characters from mapper
         chars = self.mapper.get_default_characters() 
         for i, char in enumerate(chars):
+            # Column 0: Label
             lbl_text = f"'{char}'" if char != ' ' else "'Space'"
-            lbl = ctk.CTkLabel(self.scroll_frame, text=lbl_text, width=60, font=Theme.FONT_BOLD)
+            lbl = ctk.CTkLabel(self.scroll_frame, text=lbl_text, width=40, font=Theme.FONT_BOLD)
             lbl.grid(row=i, column=0, padx=5, pady=2, sticky="e")
             
-            entry = ctk.CTkEntry(self.scroll_frame, placeholder_text="Hex", width=70)
+            # Column 1: Entry
+            entry = ctk.CTkEntry(self.scroll_frame, placeholder_text="Hex", width=60)
             entry.grid(row=i, column=1, padx=5, pady=2, sticky="w")
+            
+            # Column 2: Icon (Visual Feedback)
+            icon = ctk.CTkLabel(self.scroll_frame, text="", width=26, height=26)
+            icon.grid(row=i, column=2, padx=5, pady=2, sticky="w") # padx=5 for spacing
+            self.icon_labels[char] = icon
+
             val = self.mapper.get_mapping(char)
             if val:
                 entry.insert(0, val) 
             entry.bind("<FocusOut>", lambda event, c=char, e=entry: self.update_mapping(c, e))
             self.entries[char] = entry
             
+        # Update icons if graphics loaded
+        if self.raw_pixels:
+            self.update_icons()
+            
     def update_mapping(self, char, entry):
         val = entry.get().strip()
         self.mapper.set_mapping(char, val)
+        self.update_icons() # Trigger update
+
+    def update_icons(self):
+        if not self.raw_pixels or not getattr(self, 'full_pil_img', None):
+             return
+             
+        slot = self.gfx_slot_var.get()
+        base_offset = 0x200 if slot == "BG2" else 0x280
+        
+        for char, entry in self.entries.items():
+             val = entry.get().strip()
+             try:
+                 tile_id = int(val, 16)
+                 local_idx = tile_id - base_offset
+                 if 0 <= local_idx < (len(self.raw_pixels)//64):
+                      w_tiles = self.width_in_tiles
+                      row = local_idx // w_tiles
+                      col = local_idx % w_tiles
+                      
+                      scale = self.gfx_scale 
+                      px = 8 * scale
+                      
+                      x = col * px
+                      y = row * px
+                      
+                      crop = self.full_pil_img.crop((x, y, x+px, y+px))
+                      img = ctk.CTkImage(light_image=crop, dark_image=crop, size=(px, px))
+                      self.icon_labels[char].configure(image=img)
+                      self.icon_labels[char]._image = img 
+                 else:
+                      self.icon_labels[char].configure(image=None)
+             except Exception as e:
+                 # Silently fail for invalid hex
+                 self.icon_labels[char].configure(image=None)
 
     def save_mapping(self):
         filepath = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")])
@@ -207,9 +284,6 @@ class MappingTab:
              
              if self.raw_pixels:
                  self.refresh_graphics()
-                 
-             from tkinter import messagebox
-             messagebox.showinfo("Success", f"Loaded palette with {len(self.loaded_palette)} colors.")
              
         except Exception as e:
             from tkinter import messagebox
@@ -236,7 +310,7 @@ class MappingTab:
             from tkinter import messagebox
             messagebox.showerror("Error", f"Failed to load graphics: {e}")
 
-    def refresh_graphics(self):
+    def refresh_graphics(self, _=None):
         if not self.raw_pixels: return
         
         current_pal = None
@@ -249,6 +323,7 @@ class MappingTab:
         
         scale = self.gfx_scale
         pil_img = pil_img.resize((pil_img.width * scale, pil_img.height * scale), Image.NEAREST)
+        self.full_pil_img = pil_img
         
         self.gfx_image_tk = ImageTk.PhotoImage(pil_img)
         self.gfx_canvas.config(width=pil_img.width, height=pil_img.height)
@@ -256,6 +331,7 @@ class MappingTab:
         self.gfx_canvas.configure(scrollregion=(0, 0, pil_img.width, pil_img.height))
         
         self.draw_grid(pil_img.width, pil_img.height, scale)
+        self.update_icons()  # Update character icons with loaded graphics
 
     def draw_grid(self, w, h, scale):
         tile_px = 8 * scale
@@ -276,12 +352,10 @@ class MappingTab:
         
         tile_index = row * self.width_in_tiles + col
         
-        # Base Offset
-        base_offset = 0
-        try:
-             base_offset = int(self.ent_gfx_offset.get(), 16)
-        except: pass
-        
+        # Base Offset from Slot
+        slot = self.gfx_slot_var.get()
+        base_offset = 0x200 if slot == "BG2" else 0x280
+
         final_id = base_offset + tile_index
         hex_id = f"{final_id:03X}"
         
