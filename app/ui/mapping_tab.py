@@ -84,7 +84,7 @@ class MappingTab:
         f1 = create_compact_frame(1, 0)
         add_label(f1, "Tile Size", "Size of char tile")
         self.tile_size_var = ctk.StringVar(value=self.tile_size)
-        self.opt_size = ctk.CTkOptionMenu(f1, variable=self.tile_size_var, values=["8x8", "8x16", "16x16"], command=self.save_settings, height=24)
+        self.opt_size = ctk.CTkOptionMenu(f1, variable=self.tile_size_var, values=["8x8", "8x16", "16x16"], command=self.on_tile_size_change, height=24)
         self.opt_size.pack(fill="x")
         
         f2 = create_compact_frame(1, 1)
@@ -230,6 +230,12 @@ class MappingTab:
         self.update_icons()
         self.update_converter_button()
 
+    def on_tile_size_change(self, _=None):
+        """Handle tile size change - update grid and icons"""
+        self.save_settings()
+        if self.raw_pixels:
+            self.refresh_graphics()
+
     def save_settings(self, _=None):
         self.config.set("tile_size", self.tile_size_var.get())
         
@@ -316,6 +322,18 @@ class MappingTab:
         slot = self.gfx_slot_var.get()
         base_offset = 0x200 if slot == "BG2" else 0x280
         
+        # Get tile size
+        tile_size = self.tile_size_var.get()
+        scale = self.gfx_scale
+        
+        # Calculate tile dimensions in pixels (at scale)
+        if tile_size == "8x8":
+            tile_w_px, tile_h_px = 8 * scale, 8 * scale
+        elif tile_size == "8x16":
+            tile_w_px, tile_h_px = 8 * scale, 16 * scale
+        else:  # 16x16
+            tile_w_px, tile_h_px = 16 * scale, 16 * scale
+        
         for char, entry in self.entries.items():
              val = entry.get().strip()
              try:
@@ -326,14 +344,13 @@ class MappingTab:
                       row = local_idx // w_tiles
                       col = local_idx % w_tiles
                       
-                      scale = self.gfx_scale 
-                      px = 8 * scale
+                      px_per_tile = 8 * scale
                       
-                      x = col * px
-                      y = row * px
+                      x = col * px_per_tile
+                      y = row * px_per_tile
                       
-                      crop = self.full_pil_img.crop((x, y, x+px, y+px))
-                      img = ctk.CTkImage(light_image=crop, dark_image=crop, size=(px, px))
+                      crop = self.full_pil_img.crop((x, y, x+tile_w_px, y+tile_h_px))
+                      img = ctk.CTkImage(light_image=crop, dark_image=crop, size=(tile_w_px, tile_h_px))
                       self.icon_labels[char].configure(image=img)
                       self.icon_labels[char]._image = img 
                  else:
@@ -416,10 +433,21 @@ class MappingTab:
         self.update_icons()  # Update character icons with loaded graphics
 
     def draw_grid(self, w, h, scale):
-        tile_px = 8 * scale
-        for x in range(0, w + 1, tile_px):
+        tile_size = self.tile_size_var.get()
+        
+        # Calculate grid spacing based on tile size
+        if tile_size == "8x8":
+            tile_w_px, tile_h_px = 8 * scale, 8 * scale
+        elif tile_size == "8x16":
+            tile_w_px, tile_h_px = 8 * scale, 16 * scale
+        else:  # 16x16
+            tile_w_px, tile_h_px = 16 * scale, 16 * scale
+        
+        # Draw vertical lines
+        for x in range(0, w + 1, tile_w_px):
              self.gfx_canvas.create_line(x, 0, x, h, fill="#404040", width=1)
-        for y in range(0, h + 1, tile_px):
+        # Draw horizontal lines
+        for y in range(0, h + 1, tile_h_px):
              self.gfx_canvas.create_line(0, y, w, y, fill="#404040", width=1)
 
     def on_picker_click(self, event):
@@ -452,10 +480,24 @@ class MappingTab:
         y = self.gfx_canvas.canvasy(event.y)
         scale = self.gfx_scale
         
-        col = int(x // (8 * scale))
-        row = int(y // (8 * scale))
+        # Get tile size
+        tile_size = self.tile_size_var.get()
         
-        tile_index = row * self.width_in_tiles + col
+        # Calculate which tile grid cell was clicked (always in 8x8 units)
+        col_8x8 = int(x // (8 * scale))
+        row_8x8 = int(y // (8 * scale))
+        
+        # Snap to tile grid based on tile size
+        if tile_size == "8x16":
+            # Snap to 8x16 grid (vertical pairs)
+            row_8x8 = (row_8x8 // 2) * 2  # Round down to even row
+        elif tile_size == "16x16":
+            # Snap to 16x16 grid (2x2 blocks)
+            col_8x8 = (col_8x8 // 2) * 2  # Round down to even column
+            row_8x8 = (row_8x8 // 2) * 2  # Round down to even row
+        
+        # Calculate base tile index (top-left 8x8 tile)
+        tile_index = row_8x8 * self.width_in_tiles + col_8x8
         
         # Base Offset from Slot
         slot = self.gfx_slot_var.get()
