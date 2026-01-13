@@ -153,6 +153,33 @@ class CreditsTab:
         self.font_size_var = ctk.StringVar(value=font_size_def)
         self.opt_font_size = ctk.CTkOptionMenu(blank_row, variable=self.font_size_var, values=["8x8", "16x16"], command=lambda _: self.save_config(), width=80)
         self.opt_font_size.pack(side="left", padx=5)
+        
+        # Map16 Settings Row
+        map16_row = ctk.CTkFrame(opt_grid, fg_color="transparent")
+        map16_row.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 5))
+        
+        # Act As
+        ctk.CTkLabel(map16_row, text="Act As:").pack(side="left", padx=5)
+        act_as_def = self.config.get("act_as", "0025 (Air)")
+        self.act_as_var = ctk.StringVar(value=act_as_def)
+        self.opt_act_as = ctk.CTkOptionMenu(map16_row, variable=self.act_as_var, 
+                                            values=["0025 (Air)", "0130 (Cement)", "002B (Coin)"], 
+                                            command=lambda _: self.save_config(), width=120)
+        self.opt_act_as.pack(side="left", padx=5)
+        
+        # Priority
+        priority_def = self.config.get("priority", False)
+        self.priority_var = ctk.BooleanVar(value=priority_def)
+        ctk.CTkCheckBox(map16_row, text="Priority (On Top)", variable=self.priority_var, 
+                       command=self.save_config).pack(side="left", padx=15)
+        
+        # Start Page
+        ctk.CTkLabel(map16_row, text="Start Page (Hex):").pack(side="left", padx=(15, 5))
+        start_page_def = self.config.get("start_page", 0x60)
+        self.ent_start_page = ctk.CTkEntry(map16_row, width=50)
+        self.ent_start_page.pack(side="left", padx=5)
+        self.ent_start_page.insert(0, f"{start_page_def:02X}")
+        self.ent_start_page.bind("<FocusOut>", lambda _: self.save_config())
 
         # 3. Action & Log
         action_frame = ctk.CTkFrame(self.view_container, fg_color="transparent")
@@ -243,6 +270,14 @@ class CreditsTab:
         self.config.set("add_empty_line", self.chk_empty_var.get())
         self.config.set("blank_tile_id", self.ent_blank.get())
         self.config.set("font_size", self.font_size_var.get())
+        # Map16 Settings
+        self.config.set("act_as", self.act_as_var.get())
+        self.config.set("priority", self.priority_var.get())
+        try:
+            start_page = int(self.ent_start_page.get(), 16)
+            self.config.set("start_page", start_page)
+        except:
+            pass  # Ignore invalid hex
 
     def browse_file(self):
         file = filedialog.askopenfilename(filetypes=[("Credits File", "*.json *.txt")])

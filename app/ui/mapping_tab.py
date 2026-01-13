@@ -86,28 +86,10 @@ class MappingTab:
         self.opt_pal = ctk.CTkOptionMenu(f2, variable=self.pal_var, values=[str(i) for i in range(8)], command=self.save_settings_pal, height=24)
         self.opt_pal.pack(fill="x")
 
-        # Row 2: Act As | Start Page
-        f3 = create_compact_frame(2, 0)
-        add_label(f3, "Act As", "Map16 behavior")
-        self.act_as_var = ctk.StringVar(value=self.act_as)
-        self.opt_act = ctk.CTkOptionMenu(f3, variable=self.act_as_var, values=["0025 (Air)", "0130 (Cement)", "002B (Coin)"], command=self.save_settings, height=24)
-        self.opt_act.pack(fill="x")
 
-        f4 = create_compact_frame(2, 1)
-        add_label(f4, "Start Page (Hex)", "Map16 page number")
-        self.ent_page = ctk.CTkEntry(f4, height=24)
-        self.ent_page.insert(0, f"{self.start_page:02X}")
-        self.ent_page.bind("<FocusOut>", self.save_settings_page)
-        self.ent_page.pack(fill="x")
-
-        # Row 3: Priority (Full)
-        self.prio_var = ctk.BooleanVar(value=self.priority)
-        self.chk_prio = ctk.CTkCheckBox(self.config_frame, text="Priority (On Top)", variable=self.prio_var, command=self.save_settings)
-        self.chk_prio.grid(row=3, column=0, columnspan=2, padx=10, pady=(10,5), sticky="w")
-        
-        # Row 4: Action Buttons (New)
+        # Row 2: Action Buttons
         action_frame = ctk.CTkFrame(self.config_frame, fg_color="transparent")
-        action_frame.grid(row=4, column=0, columnspan=2, sticky="ew", pady=10)
+        action_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=10)
         
         ctk.CTkButton(action_frame, text="Load Mapping", width=80, command=self.load_mapping).pack(side="left", padx=5, expand=True, fill="x")
         ctk.CTkButton(action_frame, text="Save Mapping", width=80, command=self.save_mapping).pack(side="left", padx=5, expand=True, fill="x")
@@ -150,7 +132,8 @@ class MappingTab:
         self.raw_pixels = None # Store raw pixels (0-15)
 
         self.entries = {}
-        self.icon_labels = {} 
+        self.icon_labels = {}
+        self.picker_target = None  # Track which entry is waiting for picker selection 
         
         # Auto-load default
         success, msg = self.mapper.load_default_mappings()
@@ -174,21 +157,12 @@ class MappingTab:
         messagebox.showinfo("Character Map Help", help_text)
 
     def save_settings(self, _=None):
-        self.config.set("act_as", self.act_as_var.get())
-        self.config.set("priority", self.prio_var.get())
         self.config.set("tile_size", self.tile_size_var.get())
         
     def save_settings_pal(self, val):
         self.config.set("palette", int(val))
         self.palette = int(val)
         self.refresh_graphics()
-        
-    def save_settings_page(self, _=None):
-        try:
-            val = int(self.ent_page.get(), 16)
-            self.config.set("start_page", val)
-        except:
-            pass # Ignore invalid
 
     def populate_grid(self):
         # Clear existing
@@ -207,9 +181,16 @@ class MappingTab:
             entry = ctk.CTkEntry(self.scroll_frame, placeholder_text="Hex", width=60)
             entry.grid(row=i, column=1, padx=5, pady=2, sticky="w")
             
-            # Column 2: Icon (Visual Feedback)
+            # Column 2: Picker Button
+            picker_btn = ctk.CTkButton(self.scroll_frame, text="🎯", width=28, height=28,
+                                       font=("Arial", 14),
+                                       fg_color=Theme.BTN_PRIMARY,
+                                       command=lambda e=entry: self.activate_picker(e))
+            picker_btn.grid(row=i, column=2, padx=2, pady=2)
+            
+            # Column 3: Icon (Visual Feedback)
             icon = ctk.CTkLabel(self.scroll_frame, text="", width=26, height=26)
-            icon.grid(row=i, column=2, padx=5, pady=2, sticky="w") # padx=5 for spacing
+            icon.grid(row=i, column=3, padx=5, pady=2, sticky="w")
             self.icon_labels[char] = icon
 
             val = self.mapper.get_mapping(char)
@@ -221,6 +202,17 @@ class MappingTab:
         # Update icons if graphics loaded
         if self.raw_pixels:
             self.update_icons()
+    
+    def activate_picker(self, target_entry):
+        """Activate picker mode for selecting a tile from the canvas"""
+        self.picker_target = target_entry
+        # Change cursor globally
+        self.master.configure(cursor="crosshair")
+        self.gfx_canvas.configure(cursor="crosshair")
+        # Visual feedback: highlight the target entry
+        target_entry.configure(border_color=Theme.BTN_PRIMARY, border_width=2)
+        # Bind click outside canvas to cancel
+        self.master.bind("<Button-1>", self.on_picker_click, add="+")
             
     def update_mapping(self, char, entry):
         val = entry.get().strip()
@@ -340,6 +332,29 @@ class MappingTab:
         for y in range(0, h + 1, tile_px):
              self.gfx_canvas.create_line(0, y, w, y, fill="#404040", width=1)
 
+    def on_picker_click(self, event):
+        """Handle clicks during picker mode (cancel if outside canvas)"""
+        if not self.picker_target:
+            return
+        
+        # Check if click is on canvas
+        widget = event.widget
+        if widget == self.gfx_canvas or str(widget).startswith(str(self.gfx_canvas)):
+            # Click is on canvas, let on_grid_click handle it
+            return
+        
+        # Click is outside canvas - cancel picker mode
+        self.cancel_picker()
+    
+    def cancel_picker(self):
+        """Cancel picker mode and reset UI"""
+        if self.picker_target:
+            self.picker_target.configure(border_width=1)
+            self.picker_target = None
+        self.master.configure(cursor="")
+        self.gfx_canvas.configure(cursor="")
+        self.master.unbind("<Button-1>")
+    
     def on_grid_click(self, event):
         if not getattr(self, 'gfx_image_tk', None): return
         
@@ -359,7 +374,21 @@ class MappingTab:
         final_id = base_offset + tile_index
         hex_id = f"{final_id:03X}"
         
-        # Assign to focused entry
+        # Priority 1: Picker mode (if active)
+        if self.picker_target:
+            try:
+                self.picker_target.delete(0, "end")
+                self.picker_target.insert(0, hex_id)
+                self.picker_target.event_generate("<FocusOut>")
+                # Reset picker mode
+                self.cancel_picker()
+                # Trigger icon update immediately
+                self.update_icons()
+            except Exception as e:
+                print(f"Picker error: {e}")
+            return
+        
+        # Priority 2: Assign to focused entry (fallback)
         focused = self.master.focus_get()
         if focused and (isinstance(focused, ctk.CTkEntry) or "entry" in str(focused).lower()):
              try:
