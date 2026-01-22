@@ -28,27 +28,48 @@ class CreditsParser:
             return CreditsParser._parse_txt(filepath)
 
     @staticmethod
-    def _parse_txt(filepath):
+    def parse_content(content, is_json=False):
+        """Parses raw content string."""
+        if is_json:
+            if isinstance(content, str):
+                try: content = json.loads(content)
+                except: return {}
+            return CreditsParser._parse_json_content(content)
+        else:
+            return CreditsParser._parse_txt_content(content)
+
+    @staticmethod
+    def _parse_txt_content(text):
         authors = set()
+        for line in text.splitlines():
+            name = line.strip()
+            if name:
+                authors.add(name)
+        return {"General": sorted(list(authors), key=str.lower)}
+
+    @staticmethod
+    def _parse_txt(filepath):
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
-                for line in f:
-                    name = line.strip()
-                    if name:
-                        authors.add(name)
-            # Return sorted list
-            return {"General": sorted(list(authors), key=str.lower)}
+                return CreditsParser._parse_txt_content(f.read())
         except Exception as e:
             logger.error(f"Error parsing text credits: {e}")
             return {}
 
     @staticmethod
     def _parse_json(filepath):
-        data = {}
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = json.load(f)
-                
+            return CreditsParser._parse_json_content(content)
+        except Exception as e:
+            logger.error(f"Error parsing JSON credits file: {e}")
+            return {}
+
+    @staticmethod
+    def _parse_json_content(content):
+        data = {}
+        try:
             # Content is list of objects
             if not isinstance(content, list):
                 logger.error("JSON credits root must be a list")
@@ -74,7 +95,7 @@ class CreditsParser:
                     final_data[sec] = sorted(list(names), key=str.lower)
             
             return final_data
-
         except Exception as e:
-            logger.error(f"Error parsing JSON credits: {e}")
-            return {}
+             logger.error(f"Error parsing JSON content: {e}")
+             return {}
+

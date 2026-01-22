@@ -16,9 +16,9 @@ class MainWindow(ctk.CTk):
         
         logger.info("MainWindow: setting title/geometry")
         self.title(f"SMW Credits Creator v{VERSION} - by Saphros © 2026")
-        self.geometry("940x700")
+        self.geometry("940x740")
         
-        # Create Tabs (2 tabs now: Credits and Mapping)
+        # Create Tabs (3 tabs now: Credits, Mapping, Export)
         logger.info("MainWindow: Creating Tabview")
         self.tab_view = ctk.CTkTabview(self)
         self.tab_view.pack(fill="both", expand=True, padx=10, pady=10)
@@ -34,8 +34,10 @@ class MainWindow(ctk.CTk):
         logger.info("MainWindow: Initializing CreditsTab")
         self.credits_ui = CreditsTab(
             self.tab_credits, 
-            mapper=self.mapping_ui.mapper
+            mapper=self.mapping_ui.mapper,
+            on_mapping_change=self.mapping_ui.refresh_from_external
         )
+        
         logger.info("MainWindow: Initialization finished")
 
         # Icon Setup - Defer to avoid hanging

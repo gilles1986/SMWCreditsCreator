@@ -11,6 +11,7 @@ class Theme:
 
     # Aliases
     TEXT_ERROR = TEXT_STATUS_ERROR
+    TEXT_SUCCESS = TEXT_STATUS_SUCCESS
     TEXT_NORMAL = TEXT_STATUS_NEUTRAL  # Use light gray instead of default
 
     # Button Colors

@@ -1,262 +1,267 @@
 import customtkinter as ctk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
+import os
+import pyperclip
 from app.core.credits_parser import CreditsParser
-from app.core.map16_handler import Map16Generator
+from app.core.map16_handler import Map16Generator, Map16Handler
+from app.core.clipboard_handler import ClipboardHandler
 from app.ui.theme import Theme
 from app.core.app_config import AppConfig
 from app.core.validator import Validator
 from app.core.config_manager import ConfigManager
-import os
 
 class CreditsTab:
-    def __init__(self, master, mapper):
+    def __init__(self, master, mapper, on_mapping_change=None):
         self.master = master
         self.mapper = mapper
+        self.on_mapping_change = on_mapping_change # Callback
         self.credits_path = None
-        self.project_path = None
-        self.rhr_version = None
+        self.current_mapping_name = None # Track filename
         self.config = AppConfig()
-        self.log_history = ["Ready."] # Persistent log history
+        self.log_history = ["Ready."] 
 
         # Main Grid Config
         self.master.grid_columnconfigure(0, weight=1)
-        self.master.grid_rowconfigure(1, weight=1) # Content area expands
+        self.master.grid_rowconfigure(0, weight=1) 
         
-        # --- 1. Project Bar (Persistent Top) ---
-        self.bar_frame = ctk.CTkFrame(self.master, height=50, fg_color=Theme.BG_COLOR_2) # Darker header
-        self.bar_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
-        self.bar_frame.grid_columnconfigure(1, weight=1)
-        
-        self.lbl_proj_title = ctk.CTkLabel(self.bar_frame, text="Active Project:", font=Theme.FONT_BOLD, text_color=Theme.TEXT_DIM)
-        self.lbl_proj_title.grid(row=0, column=0, padx=(20, 10), pady=10)
-        
-        self.lbl_proj_path = ctk.CTkLabel(self.bar_frame, text="No Project Selected", text_color=Theme.TEXT_NORMAL)
-        self.lbl_proj_path.grid(row=0, column=1, padx=0, pady=10, sticky="w")
-        
-        self.btn_change = ctk.CTkButton(self.bar_frame, text="Change Folder", width=100, command=self.browse_project, fg_color=Theme.BTN_PRIMARY, text_color=Theme.BTN_PRIMARY_TEXT)
-        self.btn_change.grid(row=0, column=2, padx=10, pady=10)
-        
-        self.btn_unload = ctk.CTkButton(self.bar_frame, text="x", width=30, command=self.unload_project, fg_color=Theme.BTN_WARNING, hover_color=Theme.BTN_WARNING_HOVER, text_color=Theme.BTN_WARNING_TEXT, state="disabled")
-        self.btn_unload.grid(row=0, column=3, padx=(0, 20), pady=10)
-
-        # --- 2. Central View Container ---
+        # Central View Container
         self.view_container = ctk.CTkFrame(self.master, fg_color="transparent")
-        self.view_container.grid(row=1, column=0, sticky="nsew", padx=20, pady=20)
+        self.view_container.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
         self.view_container.grid_columnconfigure(0, weight=1)
-        self.view_container.grid_rowconfigure(0, weight=1)
-        
-        # Load last project
-        last_proj = self.config.get("last_project")
-        if last_proj and os.path.exists(last_proj):
-            self.load_project(last_proj)
-        else:
-            self.show_view_no_project()
-    # --- Project Management ---
-
-    def browse_project(self):
-        # Open directory dialog
-        folder = filedialog.askdirectory(title="Select Project Folder")
-        if folder:
-            self.load_project(folder)
-
-    def load_project(self, path):
-        # 1. Detect Version
-        version = self.detect_version(path)
-        if not version:
-             self.show_view_invalid_project("Could not detect a valid RHR or Callisto project structure.\n(Expected 'buildtool' or 'tools/Callisto' folder)")
-             return
-
-        self.project_path = path
-        self.rhr_version = version
-
-        # 2. Check Config
-        ok, msg = ConfigManager.check_exports_toml(path, version)
-        if not ok:
-             self.show_view_setup_needed(msg)
-             return
-
-        # 3. Success
-        self.config.set("last_project", path)
-        self.lbl_proj_path.configure(text=path)
-        self.btn_change.configure(text="Change")
-        self.btn_unload.configure(state="normal")
         
         self.show_view_main()
-        self.log(f"Project loaded: {path} (v{version[0]}.{version[1]})")
 
-    def detect_version(self, path):
-        # Check high version first
-        if os.path.exists(os.path.join(path, "tools", "Callisto", "callisto.exe")):
-             return (5, 13) # or newer
-        elif os.path.exists(os.path.join(path, "buildtool", "callisto.exe")):
-             return (5, 10)
-        elif os.path.exists(os.path.join(path, "buildtool", "project.toml")):
-             # Old RHR
-             return (5, 0)
-        return None
+    # ... (skipping clear_view/show_view_main) ...
 
-    def unload_project(self):
-        self.project_path = None
-        self.rhr_version = None
-        self.config.set("last_project", "")
-        self.lbl_proj_path.configure(text="No Project Selected")
-        self.btn_change.configure(text="Change Folder")
-        self.btn_unload.configure(state="disabled")
-        self.show_view_no_project()
+    def load_custom_mapping(self):
+        file = filedialog.askopenfilename(filetypes=[("JSON Mapping", "*.json")])
+        if file:
+            success, msg = self.mapper.load_mappings(file)
+            if success:
+                self.current_mapping_name = os.path.basename(file)
+                self.log(f"Loaded mapping from {self.current_mapping_name}")
+                self._update_mapping_status("Custom")
+                # Trigger external sync
+                if self.on_mapping_change:
+                     self.on_mapping_change(filename=self.current_mapping_name)
+            else:
+                messagebox.showerror("Error", msg)
+                self.log(f"Error loading mapping: {msg}")
+
+    def reset_mapping_rhr(self):
+        if messagebox.askyesno("Confirm Reset", "Reset font mapping to RHR Defaults (A-Z -> 0x280)?\nThis will clear current mappings."):
+            success, msg = self.mapper.reset_defaults_rhr()
+            self.current_mapping_name = None
+            self._update_mapping_status("Default (RHR)")
+            self.log(msg)
+            # Trigger external sync
+            if self.on_mapping_change:
+                 self.on_mapping_change(status="Default (RHR)")
+
+    def _update_mapping_status(self, status=None):
+        # Infer status if not provided
+        if status is None:
+            val_a = self.mapper.get_mapping('A')
+            if val_a == "280" or val_a == "0280":
+                status = "Default (RHR)"
+            elif val_a:
+                status = "Custom"
+            else:
+                status = "Empty / Unknown"
         
-    def fix_config(self):
-        if not self.project_path or not self.rhr_version:
-             return
+        # Display filename if custom and available
+        display_text = status
+        if status == "Custom" and self.current_mapping_name:
+            display_text = self.current_mapping_name
         
-        ok, msg = ConfigManager.fix_exports_toml(self.project_path, self.rhr_version)
-        if ok:
-             self.log("Configuration fixed.")
-             self.load_project(self.project_path) # Reload
+        self.lbl_mapping_status.configure(text=display_text)
+        
+        if "Default" in status:
+            self.lbl_mapping_status.configure(text_color=Theme.TEXT_SUCCESS) 
+        elif "Custom" in status:
+            self.lbl_mapping_status.configure(text_color=Theme.BTN_PRIMARY) 
         else:
-             from tkinter import messagebox
-             messagebox.showerror("Error", f"Failed to fix config: {msg}")
+            self.lbl_mapping_status.configure(text_color=Theme.BTN_DANGER)
 
     def clear_view(self):
         for widget in self.view_container.winfo_children():
             widget.destroy()
 
-    def show_view_no_project(self):
-        self.clear_view()
-        
-        # Center Content
-        center_frame = ctk.CTkFrame(self.view_container, fg_color="transparent")
-        center_frame.grid(row=0, column=0)
-        
-        ctk.CTkLabel(center_frame, text="No Project Loaded", font=("Arial", 20, "bold"), text_color=Theme.TEXT_DIM).pack(pady=10)
-        ctk.CTkLabel(center_frame, text="Please select a valid RHR project folder to begin.", text_color=Theme.TEXT_DIM).pack(pady=5)
-        ctk.CTkButton(center_frame, text="Select RHR Folder", command=self.browse_project, width=200, height=40, font=Theme.FONT_BOLD).pack(pady=20)
-
-    def show_view_setup_needed(self, check_msg):
-        self.clear_view()
-        
-        # Warning Card
-        card = ctk.CTkFrame(self.view_container, border_width=2, border_color=Theme.BTN_WARNING)
-        card.grid(row=0, column=0)
-        
-        config_path = ConfigManager.get_config_path(self.project_path, self.rhr_version)
-        config_file = os.path.basename(config_path) if config_path else "Config file"
-
-        ctk.CTkLabel(card, text="⚠️ Configuration Update Required", font=("Arial", 16, "bold"), text_color=Theme.BTN_WARNING).pack(pady=(20, 10), padx=40)
-        ctk.CTkLabel(card, text=f"{config_file} needs to be modified to make this tool work.", text_color=Theme.TEXT_NORMAL, font=("Arial", 12)).pack(pady=10, padx=20)
-        
-        ctk.CTkButton(card, text="Fix Configuration", command=self.fix_config, fg_color=Theme.BTN_WARNING, hover_color=Theme.BTN_WARNING_HOVER, text_color=Theme.BTN_WARNING_TEXT, width=200, height=35).pack(pady=20)
-
-    def show_view_invalid_project(self, message):
-        self.clear_view()
-        
-        # Error Card
-        card = ctk.CTkFrame(self.view_container, border_width=2, border_color=Theme.BTN_WARNING, width=400) # Explicit width
-        card.grid(row=0, column=0)
-        
-        ctk.CTkLabel(card, text="⚠️ Invalid Project", font=("Arial", 16, "bold"), text_color=Theme.BTN_WARNING).pack(pady=(20, 10), padx=40)
-        
-        # Wrapped Message
-        lbl_msg = ctk.CTkLabel(card, text=message, text_color=Theme.TEXT_NORMAL, wraplength=400, justify="center")
-        lbl_msg.pack(pady=10, padx=20)
-        
-        ctk.CTkButton(card, text="Select Different Folder", command=self.browse_project, fg_color=Theme.BTN_WARNING, hover_color=Theme.BTN_WARNING_HOVER, text_color=Theme.BTN_WARNING_TEXT, width=200, height=35).pack(pady=20)
-
     def show_view_main(self):
+        print("DEBUG: Loading CreditsTab Layout Fix V2")
         self.clear_view()
 
-        # Layout: Top (Source), Middle (Options), Bottom (Log)
+        # Layout: Top (Split Column), Bottom (Settings + Log)
         
-        # 1. Source Panel
-        src_frame = ctk.CTkFrame(self.view_container)
-        src_frame.pack(fill="x", pady=(0, 10))
+        # Container for Top Sections (Content + Visuals)
+        top_container = ctk.CTkFrame(self.view_container, fg_color="transparent")
+        top_container.pack(fill="x", pady=(0, 10))
+        top_container.grid_columnconfigure(0, weight=1)
+        top_container.grid_columnconfigure(1, weight=1)
         
-        ctk.CTkLabel(src_frame, text="Credits Source", font=Theme.FONT_BOLD).pack(anchor="w", padx=15, pady=10)
+        # --- Section 1: Credits Content ("What") ---
+        # Left Column (Spans 2 rows)
+        sec1 = self._create_section_frame(top_container, "1. Credits Content")
+        sec1.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, 5))
         
-        file_row = ctk.CTkFrame(src_frame, fg_color="transparent")
-        file_row.pack(fill="x", padx=10, pady=(0, 15))
+        sec1.grid_rowconfigure(1, weight=1) # Content area grows
+        # Toolbar Header (Toggle + File Input)
+        toolbar = ctk.CTkFrame(sec1, fg_color="transparent")
+        toolbar.pack(fill="x", padx=10, pady=(5, 5))
+        toolbar.grid_columnconfigure(1, weight=1) # Entry grows
         
-        self.path_entry = ctk.CTkEntry(file_row, placeholder_text="Path to credits file (.txt or .json)")
-        self.path_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        # Toggle
+        self.src_mode_var = ctk.StringVar(value="file")
+        self.seg_mode = ctk.CTkSegmentedButton(toolbar, values=["File", "Direct Text"], 
+                                               variable=self.src_mode_var, 
+                                               command=self.toggle_source_mode,
+                                               width=150)
+        self.seg_mode.grid(row=0, column=0, padx=(0, 10))
+        self.seg_mode.set("File")
+
+        # File Inputs (Grouped for hiding)
+        self.frm_file_inputs = ctk.CTkFrame(toolbar, fg_color="transparent")
+        self.frm_file_inputs.grid(row=0, column=1, sticky="ew")
+        self.frm_file_inputs.grid_columnconfigure(0, weight=1)
+
+        self.path_entry = ctk.CTkEntry(self.frm_file_inputs, placeholder_text="Path to credits file (.txt or .json)")
+        self.path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+        ctk.CTkButton(self.frm_file_inputs, text="Browse...", width=80, command=self.browse_file).grid(row=0, column=1)
+        
         if self.credits_path:
             self.path_entry.insert(0, self.credits_path)
-            
-        ctk.CTkButton(file_row, text="Browse File...", width=100, command=self.browse_file).pack(side="right")
-        
-        ctk.CTkLabel(src_frame, text="💡 Supports: .txt (1 author/line) or .json (SMW Credits Manager)", text_color=Theme.TEXT_DIM, font=("Arial", 11)).pack(anchor="w", padx=15, pady=(0, 10))
 
-        # 2. Options Panel
-        opt_frame = ctk.CTkFrame(self.view_container)
-        opt_frame.pack(fill="x", pady=10)
+        # Content Area
+        self.content_area = ctk.CTkFrame(sec1, fg_color="transparent")
+        self.content_area.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.content_area.grid_columnconfigure(0, weight=1)
+        self.content_area.grid_rowconfigure(0, weight=1)
+
+        # Direct Text Input (Initially hidden)
+        self.txt_credits_input = ctk.CTkTextbox(self.content_area)
+        # Note: We grid/pack this in toggle
+
+        # Hints
+        self.lbl_file_hint = ctk.CTkLabel(self.content_area, text="💡 Supports: .txt (1 author/line) or .json (SMW Credits Manager)", text_color=Theme.TEXT_DIM, font=("Arial", 11), anchor="nw")
         
-        ctk.CTkLabel(opt_frame, text="Generation Options", font=Theme.FONT_BOLD).pack(anchor="w", padx=15, pady=10)
+        self.toggle_source_mode("File")
+
+        # --- Section 2: Appearance & Font ("How") ---
+        # Right Column
+        sec2 = self._create_section_frame(top_container, "2. Appearance & Font")
+        sec2.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=(0, 5))
         
-        # Grid for options
-        opt_grid = ctk.CTkFrame(opt_frame, fg_color="transparent")
-        opt_grid.pack(fill="x", padx=10, pady=(0, 15))
+        # Font Mapping Control Area
+        font_frame = ctk.CTkFrame(sec2, fg_color="transparent")
+        font_frame.pack(fill="x", padx=10, pady=5)
+        
+        # Row 1: Label + Status
+        status_row = ctk.CTkFrame(font_frame, fg_color="transparent")
+        status_row.pack(fill="x", pady=(0, 5))
+        ctk.CTkLabel(status_row, text="Font Mapping:", font=Theme.FONT_BOLD).pack(side="left", padx=(0, 10))
+        self.lbl_mapping_status = ctk.CTkLabel(status_row, text="Unknown", text_color=Theme.TEXT_DIM)
+        self.lbl_mapping_status.pack(side="left")
+        
+        # Row 2: Buttons
+        btn_row = ctk.CTkFrame(font_frame, fg_color="transparent")
+        btn_row.pack(fill="x")
+        
+        ctk.CTkButton(btn_row, text="Load Mapping (.json)", width=140, height=24, 
+                      fg_color=Theme.BTN_SECONDARY, command=self.load_custom_mapping).pack(side="left", padx=(0, 5))
+        
+        # Reset Icon Button
+        ctk.CTkButton(btn_row, text="↺", width=24, height=24, 
+                      font=("Arial", 16, "bold"),
+                      fg_color=Theme.BTN_DANGER, 
+                      command=self.reset_mapping_rhr,
+                      hover_color="#B71C1C").pack(side="left") # Dark red hover
+
+        self._update_mapping_status()
+
+        # Visual Options Grid
+        vis_grid = ctk.CTkFrame(sec2, fg_color="transparent")
+        vis_grid.pack(fill="x", padx=10, pady=10)
         
         # Load Defaults
         opt_def = self.config.get("optimize_columns", True)
         empty_def = self.config.get("add_empty_line", False)
-        blank_def = self.config.get("blank_tile_id", "0F8")
-        font_size_def = self.config.get("tile_size", "8x8") # Use tile_size
+        font_size_def = self.config.get("tile_size", "8x8")
+
+        self.chk_capitalize_var = ctk.BooleanVar(value=self.config.get("capitalize", False))
+        ctk.CTkCheckBox(vis_grid, text="Capitalize Text (UPPERCASE)", variable=self.chk_capitalize_var, command=self.save_config).grid(row=0, column=0, sticky="w", padx=10, pady=5)
 
         self.chk_optimize_var = ctk.BooleanVar(value=opt_def)
-        ctk.CTkCheckBox(opt_grid, text="Optimize Columns (2 Names/Row)", variable=self.chk_optimize_var, command=self.save_config).grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        ctk.CTkCheckBox(vis_grid, text="Optimize Columns (2 Names/Row)", variable=self.chk_optimize_var, command=self.save_config).grid(row=1, column=0, sticky="w", padx=10, pady=5)
         
         self.chk_empty_var = ctk.BooleanVar(value=empty_def)
-        ctk.CTkCheckBox(opt_grid, text="Add Empty Line After Section", variable=self.chk_empty_var, command=self.save_config).grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        ctk.CTkCheckBox(vis_grid, text="Add Empty Line After Section", variable=self.chk_empty_var, command=self.save_config).grid(row=2, column=0, sticky="w", padx=10, pady=5)
         
-        # Blank Tile & Font Size
-        blank_row = ctk.CTkFrame(opt_grid, fg_color="transparent")
-        blank_row.grid(row=0, column=1, rowspan=2, sticky="e", padx=20)
-        
-        ctk.CTkLabel(blank_row, text="Blank Tile ID:").pack(side="left", padx=5)
-        self.ent_blank = ctk.CTkEntry(blank_row, width=50)
-        self.ent_blank.pack(side="left", padx=5)
-        self.ent_blank.insert(0, blank_def)
-        
-        ctk.CTkLabel(blank_row, text="Font Size:").pack(side="left", padx=(15, 5))
+        frame_size = ctk.CTkFrame(vis_grid, fg_color="transparent")
+        frame_size.grid(row=0, column=1, rowspan=3, sticky="ne", padx=20)
+        ctk.CTkLabel(frame_size, text="Font Size:").pack(side="left", padx=5)
         self.font_size_var = ctk.StringVar(value=font_size_def)
-        self.opt_font_size = ctk.CTkOptionMenu(blank_row, variable=self.font_size_var, values=["8x8", "8x16", "16x16"], command=lambda _: self.save_config(), width=80)
+        self.opt_font_size = ctk.CTkOptionMenu(frame_size, variable=self.font_size_var, values=["8x8", "8x16", "16x16"], command=lambda _: self.save_config(), width=80)
         self.opt_font_size.pack(side="left", padx=5)
+
+        # --- Section 3: Map16 Settings ("Settings") ---
+        sec3 = self._create_section_frame(top_container, "3. Map16 Settings")
+        sec3.grid(row=1, column=1, sticky="nsew", padx=(5, 0), pady=(5, 0))
         
-        # Map16 Settings Row
-        map16_row = ctk.CTkFrame(opt_grid, fg_color="transparent")
-        map16_row.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 5))
+        map16_grid = ctk.CTkFrame(sec3, fg_color="transparent")
+        map16_grid.pack(fill="x", padx=10, pady=5)
         
-        # Act As
-        ctk.CTkLabel(map16_row, text="Act As:").pack(side="left", padx=5)
+        # Row 1: Blank Tile + Act As
+        blank_def = self.config.get("blank_tile_id", "0F8")
+        ctk.CTkLabel(map16_grid, text="Blank Tile ID:").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        self.ent_blank = ctk.CTkEntry(map16_grid, width=60)
+        self.ent_blank.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        self.ent_blank.insert(0, blank_def)
+
         act_as_def = self.config.get("act_as", "0025 (Air)")
+        ctk.CTkLabel(map16_grid, text="Act As:").grid(row=0, column=2, sticky="e", padx=10, pady=5)
         self.act_as_var = ctk.StringVar(value=act_as_def)
-        self.opt_act_as = ctk.CTkOptionMenu(map16_row, variable=self.act_as_var, 
+        self.opt_act_as = ctk.CTkOptionMenu(map16_grid, variable=self.act_as_var, 
                                             values=["0025 (Air)", "0130 (Cement)", "002B (Coin)"], 
                                             command=lambda _: self.save_config(), width=120)
-        self.opt_act_as.pack(side="left", padx=5)
-        
-        # Priority
+        self.opt_act_as.grid(row=0, column=3, sticky="w", padx=5, pady=5)
+
+        # Row 2: Priority + Start Page
         priority_def = self.config.get("priority", False)
         self.priority_var = ctk.BooleanVar(value=priority_def)
-        ctk.CTkCheckBox(map16_row, text="Priority (On Top)", variable=self.priority_var, 
-                       command=self.save_config).pack(side="left", padx=15)
-        
-        # Start Page
-        ctk.CTkLabel(map16_row, text="Start Page (Hex):").pack(side="left", padx=(15, 5))
+        ctk.CTkCheckBox(map16_grid, text="Priority (On Top)", variable=self.priority_var, command=self.save_config).grid(row=1, column=0, columnspan=2, sticky="w", padx=20, pady=5)
+
+        ctk.CTkLabel(map16_grid, text="Start Page (Hex):").grid(row=1, column=2, sticky="e", padx=10, pady=5)
         start_page_def = self.config.get("start_page", 0x60)
-        self.ent_start_page = ctk.CTkEntry(map16_row, width=50)
-        self.ent_start_page.pack(side="left", padx=5)
+        self.ent_start_page = ctk.CTkEntry(map16_grid, width=60)
+        self.ent_start_page.grid(row=1, column=3, sticky="w", padx=5, pady=5)
         self.ent_start_page.insert(0, f"{start_page_def:02X}")
         self.ent_start_page.bind("<FocusOut>", lambda _: self.save_config())
-        
+
         # 3. Actions & Log
         action_frame = ctk.CTkFrame(self.view_container)
         action_frame.pack(fill="both", expand=True, pady=10)
         
-        self.btn_generate = ctk.CTkButton(action_frame, text="GENERATE CREDITS", 
-                                          command=self.generate, 
-                                          height=40, font=('Arial', 14, 'bold'),
-                                          fg_color=Theme.BTN_SUCCESS,
-                                          hover_color=Theme.BTN_SUCCESS_HOVER if hasattr(Theme, 'BTN_SUCCESS_HOVER') else None)
-        self.btn_generate.pack(fill="x", padx=20, pady=20)
+        # Grid for Actions
+        act_grid = ctk.CTkFrame(action_frame, fg_color="transparent")
+        act_grid.pack(fill="x", padx=20, pady=10)
+        
+        # self.btn_generate_proj = ctk.CTkButton(act_grid, text="Export as Text File (.txt)", 
+        #                                   command=self.generate_text_file, 
+        #                                   height=40, font=('Arial', 13, 'bold'),
+        #                                   fg_color=Theme.BTN_PRIMARY)
+        # self.btn_generate_proj.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        
+        self.btn_save_bin = ctk.CTkButton(act_grid, text="Save .map16", 
+                                          command=self.save_as_file, 
+                                          height=40, font=('Arial', 13, 'bold'),
+                                          fg_color=Theme.BTN_SUCCESS)
+        self.btn_save_bin.pack(side="left", fill="x", expand=True, padx=5)
+
+        # self.btn_clipboard = ctk.CTkButton(act_grid, text="Copy to Clipboard", 
+        #                                   command=self.copy_to_clipboard, 
+        #                                   height=40, font=('Arial', 13, 'bold'), # Standard color
+        #                                   )
+        # self.btn_clipboard.pack(side="left", fill="x", expand=True, padx=(10, 0))
         
         # Log Pane
         ctk.CTkLabel(action_frame, text="Output Log:", text_color=Theme.TEXT_DIM, font=("Arial", 11)).pack(anchor="w", padx=20, pady=(0, 5))
@@ -273,11 +278,20 @@ class CreditsTab:
 
     # ... (rest) ...
 
+    def _create_section_frame(self, parent, title):
+        frame = ctk.CTkFrame(parent)
+        # Note: We do NOT pack here, allowing grid/pack by caller
+        ctk.CTkLabel(frame, text=title, font=Theme.FONT_BOLD).pack(anchor="w", padx=15, pady=5)
+        return frame
+
+
+
     def save_config(self):
         self.config.set("optimize_columns", self.chk_optimize_var.get())
         self.config.set("add_empty_line", self.chk_empty_var.get())
         self.config.set("blank_tile_id", self.ent_blank.get())
         self.config.set("tile_size", self.font_size_var.get()) # Save as tile_size
+        self.config.set("capitalize", self.chk_capitalize_var.get())
         # Map16 Settings
         self.config.set("act_as", self.act_as_var.get())
         self.config.set("priority", self.priority_var.get())
@@ -293,6 +307,18 @@ class CreditsTab:
             self.credits_path = file
             self.path_entry.delete(0, "end")
             self.path_entry.insert(0, file)
+            
+    def toggle_source_mode(self, mode):
+        # inputs are: self.frm_file_inputs (grid in toolbar), self.txt_credits_input (pack in content), self.lbl_file_hint (pack in content)
+        
+        if mode == "File":
+            self.frm_file_inputs.grid() # Restore
+            self.txt_credits_input.pack_forget()
+            self.lbl_file_hint.pack(anchor="nw", pady=(5,0))
+        else:
+            self.frm_file_inputs.grid_remove()
+            self.lbl_file_hint.pack_forget()
+            self.txt_credits_input.pack(fill="both", expand=True)
 
     def log(self, message):
         # Helper to log safely even if view changed (though usually log is in main view)
@@ -306,41 +332,12 @@ class CreditsTab:
         else:
             print(f"[LOG] {message}")
 
-    def generate(self):
-        self.save_config() 
-        # 1. Validation
-        if not self.credits_path:
-            self.log("Error: No credits file selected.")
-            return
-            
-        if not self.project_path:
-             self.log("Error: No Project selected.")
-             return
-             
-        # 1.5 Safety Save - Ensure Map16 files exist in text format
-        from app.core.callisto_handler import CallistoHandler
-        self.log("Running safety 'callisto save'...")
-        ok, msg = CallistoHandler.save(self.project_path, self.rhr_version)
-        if not ok:
-             self.log(f"Error executing save: {msg}")
-             self.log("Aborting to prevent data corruption. Please check Callisto.")
-             return
+    def _generate_tiles_internal(self):
+        """Helper to generate tiles based on current settings."""
 
-        # 2. Parse Credits
-        self.log(f"Parsing {os.path.basename(self.credits_path)}...")
-        credits_data = CreditsParser.parse_file(self.credits_path)
+        act_val = self.act_as_var.get().split()[0]
         
-        total_names = sum(len(v) for v in credits_data.values())
-        self.log(f"Found {total_names} authors in {len(credits_data)} sections.")
-        
-        # 3. Generate Tiles
-        self.log("Generating Map16 Data...")
-        generator = Map16Generator(self.mapper)
-        
-        # Parse Act As string "0025 (Air)" -> "0025"
-        act_raw = self.config.get("act_as", "0025")
-        act_val = act_raw.split()[0]
-        
+        # Options
         options = {
             "optimize_columns": self.chk_optimize_var.get(),
             "add_empty_line": self.chk_empty_var.get(),
@@ -351,87 +348,132 @@ class CreditsTab:
             "font_size": self.config.get("tile_size", "8x8")
         }
         
-        tiles = generator.generate_credits_tiles(credits_data, options)
-        self.log(f"Generated {len(tiles)} Map16 tiles.")
-        
-        # 4. Preview / Export
-        tiles_per_page = 16 * 16 # 256
-        pages_needed = (len(tiles) + tiles_per_page - 1) // tiles_per_page
-        self.log(f"Requires {pages_needed} Map16 Pages.")
-        
-        # Determine output directory based on version
-        # < v5.10: resources/map16/All.map16/global_pages/FG_pages
-        # >= v5.10: export/all_map16.map16/global_pages/FG_pages
-        
-        is_legacy_path = False
-        if self.rhr_version and self.rhr_version < (5, 10):
-            is_legacy_path = True
-            
-        if is_legacy_path:
-             export_dir = os.path.join(self.project_path, "resources", "map16", "All.map16", "global_pages", "FG_pages")
-        else:
-             export_dir = os.path.join(self.project_path, "export", "all_map16.map16", "global_pages", "FG_pages")
-
-        if not os.path.exists(export_dir):
-            try:
-                os.makedirs(export_dir, exist_ok=True)
-            except:
-                pass
-                
-        if not os.path.exists(export_dir):
-             self.log(f"Error: Could not locate map16 export folder at {export_dir}")
-             return
-             
-        from app.core.map16_handler import Map16Handler
-        
-        # Calculate which pages we'll be generating
-        current_page = self.config.get("start_page", 0x60)
-        pages_to_generate = []
-        for i in range(pages_needed):
-            page_hex = f"{current_page + i:02X}"
-            pages_to_generate.append(f"page_{page_hex}.txt")
-        
-        # Only delete the pages we're about to regenerate
-        self.log(f"Cleaning up {len(pages_to_generate)} page(s) that will be regenerated...")
         try:
-            for fname in pages_to_generate:
-                fpath = os.path.join(export_dir, fname)
-                if os.path.exists(fpath):
-                    os.remove(fpath)
-                    self.log(f"Deleted: {fname}")
-        except Exception as e:
-            self.log(f"Warning: Could not clean files: {e}")
-        
-        for i in range(pages_needed):
-            start_index = i * tiles_per_page
-            end_index = start_index + tiles_per_page
-            chunk = tiles[start_index:end_index]
-            
-            page_hex = f"{current_page:02X}"
-            filename = f"page_{page_hex}.txt"
-            output_path = os.path.join(export_dir, filename)
-            
-            # Start Hex for this page
-            start_tile_hex = f"{page_hex}00"
-            
-            try:
-                lines = Map16Handler.generate_page_content(start_tile_hex, chunk)
-                # UTF-8 without BOM, but explicit CRLF for Windows compatibility
-                with open(output_path, 'w', encoding='utf-8', newline='\r\n') as f:
-                    f.writelines(lines)
-                self.log(f"Generated: {filename} ({len(lines)} tiles)")
-            except Exception as e:
-                self.log(f"Error writing {filename}: {e}")
-                
-            current_page += 1
+            # Check Mapping Exist
+            if not self.mapper.mappings:
+                if messagebox.askyesno("No Mapping", "No font mapping loaded. Load default (RHR)?"):
+                    self.mapper.reset_defaults_rhr()
+                    self._update_mapping_status("Default (RHR)")
+                else:
+                    return None, None
 
-        self.log("Done. Files generated.")
+            credits_data = None
+            mode = self.src_mode_var.get()
+            
+            if mode == "File":
+                if not self.credits_path:
+                     self.log("Error: No credits file selected.")
+                     messagebox.showerror("Error", "Please select a credits file.")
+                     return None, None
+                self.log(f"Parsing file: {os.path.basename(self.credits_path)}")
+                credits_data = CreditsParser.parse_file(self.credits_path)
+            else:
+                # Text Input
+                content = self.txt_credits_input.get("1.0", "end").strip()
+                if not content:
+                     self.log("Error: Credits text is empty.")
+                     messagebox.showerror("Error", "Please enter names in the text box.")
+                     return None, None
+                
+                # Check if JSON
+                is_json = content.strip().startswith(("[", "{"))
+                credits_data = CreditsParser.parse_content(content, is_json=is_json)
+                self.log("Parsed text content.")
+
+            if not credits_data:
+                 self.log("Error: Failed to parse credits content.")
+                 return None, None
+
+            # Apply Capitalization (Uppercase all content)
+            if self.config.get("capitalize", False) and credits_data:
+                new_data = {}
+                for sec, names in credits_data.items():
+                     # Uppercase Header
+                     new_sec = sec.upper()
+                     # Uppercase Names
+                     new_names = [n.upper() for n in names]
+                     new_data[new_sec] = new_names
+                credits_data = new_data
+
+            generator = Map16Generator(self.mapper)
+            tiles = generator.generate_credits_tiles(credits_data, options)
+            self.log(f"Generated {len(tiles)} tiles.")
+            
+            # Map16 Page
+            try: page_val = int(self.ent_start_page.get(), 16)
+            except: page_val = 0
+            
+            return tiles, page_val
+            
+        except Exception as e:
+            self.log(f"Error generating tiles: {e}")
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror("Generation Error", str(e))
+            return None, None
+
+    def generate_text_file(self):
+        """Generates text file export."""
+        tiles, page_val = self._generate_tiles_internal()
+        if not tiles: return # Error logged already
         
-        # 5. Callisto Update
-        from app.core.callisto_handler import CallistoHandler
-        self.log("Running 'callisto update'...")
-        ok, msg = CallistoHandler.update(self.project_path, self.rhr_version)
-        if ok:
-             self.log(f"Success: {msg}")
-        else:
-             self.log(f"Warning: {msg}")
+        self.log(f"Generating Text Export... ({len(tiles)} tiles)")
+        
+        text_content = Map16Handler.generate_map16_text(page_val, tiles)
+        
+        f = filedialog.asksaveasfilename(defaultextension=".txt", 
+                                         filetypes=[("Text File", "*.txt"), ("All Files", "*.*")],
+                                         initialfile=f"page_{page_val:02X}.txt")
+                                         
+        if f:
+            try:
+                with open(f, "w", encoding="utf-8") as file:
+                    file.write(text_content)
+                self.log(f"Saved text export to {f}")
+                messagebox.showinfo("Success", f"Saved text file:\n{os.path.basename(f)}")
+            except Exception as e:
+                 self.log(f"Error saving text file: {e}")
+                 messagebox.showerror("Error", f"Failed to save text file: {e}")
+
+    def save_as_file(self):
+        """Export as binary .map16 file."""
+        tiles, page_val = self._generate_tiles_internal()
+        if not tiles: return
+        
+        data = Map16Handler.generate_map16_binary(page_val, tiles)
+        f = filedialog.asksaveasfilename(defaultextension=".map16", filetypes=[("Lunar Magic Map16", "*.map16")])
+        if f:
+             try:
+                 with open(f, "wb") as file:
+                     file.write(data)
+                 self.log(f"Saved binary .map16 to {f}")
+                 messagebox.showinfo("Success", f"Saved .map16 file.")
+             except Exception as e:
+                 self.log(f"Error saving binary: {e}")
+                 messagebox.showerror("Error", str(e))
+
+    def copy_to_clipboard(self):
+         try:
+             tiles, page_val = self._generate_tiles_internal()
+             if not tiles: 
+                 self.log("Warning: No tiles generated (0).")
+                 return
+             
+             # Generate Binary Data for Clipboard (Selection Format)
+             binary_data = Map16Handler.generate_map16_selection(tiles)
+             self.log(f"Clipboard Binary Size: {len(binary_data)} bytes")
+             
+             # Copy to Clipboard (Native)
+             if ClipboardHandler.copy_map16(binary_data):
+                 self.log(f"Copied {len(tiles)} tiles to clipboard (Binary Format).")
+             else:
+                 self.log("Error: Failed to register or set clipboard data.")
+                 
+         except Exception as e:
+             self.log(f"Clipboard Error: {e}")
+             import traceback
+             traceback.print_exc()
+
+    def generate(self):
+        # Legacy stub
+        self.generate_text_file()

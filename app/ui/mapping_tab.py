@@ -13,6 +13,7 @@ class MappingTab:
         self.master = master
         self.mapper = Mapper()
         self.config = AppConfig()
+        self.current_mapping_name = None # Track loaded filename
         
         # Load Settings from Config
         self.act_as = self.config.get("act_as", "0025 (Air)")
@@ -94,10 +95,13 @@ class MappingTab:
         self.opt_pal = ctk.CTkOptionMenu(f2, variable=self.pal_var, values=[str(i) for i in range(8)], command=self.save_settings_pal, height=24)
         self.opt_pal.pack(fill="x")
 
+        # Row 2: Status Label
+        self.lbl_mapping_status = ctk.CTkLabel(self.config_frame, text="Mapping: Default", text_color=Theme.TEXT_DIM, font=("Arial", 11))
+        self.lbl_mapping_status.grid(row=2, column=0, columnspan=2, pady=(5, 0))
 
-        # Row 2: Action Buttons
+        # Row 3: Action Buttons
         action_frame = ctk.CTkFrame(self.config_frame, fg_color="transparent")
-        action_frame.grid(row=2, column=0, columnspan=2, sticky="ew", pady=10)
+        action_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=10)
         
         ctk.CTkButton(action_frame, text="Load Mapping", width=80, command=self.load_mapping).pack(side="left", padx=5, expand=True, fill="x")
         ctk.CTkButton(action_frame, text="Save Mapping", width=80, command=self.save_mapping).pack(side="left", padx=5, expand=True, fill="x")
@@ -154,7 +158,9 @@ class MappingTab:
         
         # Auto-load default
         success, msg = self.mapper.load_default_mappings()
-        if not success:
+        if success:
+             self.lbl_mapping_status.configure(text="Mapping: Default (RHR)", text_color=Theme.TEXT_SUCCESS)
+        else:
             print(f"Auto-load failed: {msg}") 
             
         # Try to load default palette
@@ -195,6 +201,12 @@ class MappingTab:
             print(f"[ERROR] Failed to load default palette: {e}")
 
     def open_bulk_editor(self):
+        # Sync UI to Mapper before opening
+        for char, entry in self.entries.items():
+             val = entry.get().strip()
+             if val:
+                 self.mapper.set_mapping(char, val)
+        
         BulkEditorWindow(self.master, self.mapper, self.populate_grid)
 
     def show_character_map_help(self):
@@ -258,13 +270,44 @@ class MappingTab:
             val = entry.get().strip()
             if val:
                 try:
-                    tile_id = int(val, 16)
-                    new_id = tile_id + offset
-                    new_hex = f"{new_id:03X}"
-                    entry.delete(0, "end")
-                    entry.insert(0, new_hex)
-                    self.mapper.set_mapping(char, new_hex)
-                    converted_count += 1
+                    # Handle both single values and comma-separated composite tiles
+                    parts = [p.strip() for p in val.split(',')]
+                    converted_parts = []
+                    
+                    for part in parts:
+                        if not part:
+                            continue
+                            
+                        # Check if part has flags (e.g., "280:xy")
+                        if ':' in part:
+                            id_str, flags = part.split(':', 1)
+                            tile_id = int(id_str, 16)
+                            
+                            # Only convert tiles >= 0x180 (skip shared tiles like 0F8)
+                            if tile_id >= 0x180:
+                                new_id = tile_id + offset
+                                converted_parts.append(f"{new_id:03X}:{flags}")
+                            else:
+                                # Keep unchanged
+                                converted_parts.append(part)
+                        else:
+                            # No flags, just convert the ID
+                            tile_id = int(part, 16)
+                            
+                            # Only convert tiles >= 0x180 (skip shared tiles like 0F8)
+                            if tile_id >= 0x180:
+                                new_id = tile_id + offset
+                                converted_parts.append(f"{new_id:03X}")
+                            else:
+                                # Keep unchanged
+                                converted_parts.append(part)
+                    
+                    if converted_parts:
+                        new_hex = ", ".join(converted_parts)
+                        entry.delete(0, "end")
+                        entry.insert(0, new_hex)
+                        self.mapper.set_mapping(char, new_hex)
+                        converted_count += 1
                 except:
                     pass
         
@@ -297,8 +340,12 @@ class MappingTab:
         self.entries = {}
         self.icon_labels = {}
             
-        # Get characters from mapper
-        chars = self.mapper.get_default_characters() 
+        # Get characters from mapper (Only what's mapped + Space)
+        # This fixes "Clear Mapping" showing ghosts because of default list.
+        keys = list(self.mapper.mappings.keys())
+        if ' ' not in keys:
+            keys.append(' ')
+        chars = sorted(keys) 
         for i, char in enumerate(chars):
             # Styling constants
             ROW_PADY = 8
@@ -357,8 +404,19 @@ class MappingTab:
         # Update converter button based on current mappings
         self.update_converter_button()
     
+    
     def activate_picker(self, target_entry):
         """Activate picker mode for selecting a tile from the canvas"""
+        
+        # Toggle check: If clicking the same entry, cancel picker
+        if getattr(self, 'picker_target', None) == target_entry:
+             self.cancel_picker()
+             return
+
+        # If switching from another entry, cancel first to clean up
+        if getattr(self, 'picker_target', None):
+             self.cancel_picker()
+
         self.picker_target = target_entry
         self.picker_sub_index = None
         self.picker_sub_vals = []
@@ -384,7 +442,16 @@ class MappingTab:
         # 1. Parse current values
         val = target_entry.get().strip()
         try:
-             parts = [int(p, 16) for p in val.split(',') if p.strip()]
+             # Parse with flags support (ID:flags)
+             # e.g. "280:x, 281:y"
+             parts = []
+             raw_parts = [p.strip() for p in val.split(',') if p.strip()]
+             for p in raw_parts:
+                 if ':' in p:
+                     id_str, flags = p.split(':')
+                     parts.append(f"{int(id_str, 16)}:{flags}")
+                 else:
+                     parts.append(int(p, 16))
         except:
              parts = []
              
@@ -396,11 +463,39 @@ class MappingTab:
         req_len = 2 if tile_size == "8x16" else 4
         if len(parts) < req_len:
              # Fill with sequential defaults based on first item (or 0)
-             start = parts[0] if parts else 0
+             # Helper to get pure int from part
+             def get_int(pt):
+                 if isinstance(pt, str): return int(pt.split(':')[0])
+                 return pt
+                 
+             start = get_int(parts[0]) if parts else 0
+             
              if tile_size == "8x16":
-                  parts = [start, start + 1]
+                  # Auto-split: If we have 1 ID, calculate bottom tile
+                  # User expects: single ID "280" -> split into "280, 290" (top, bottom)
+                  if len(parts) == 1:
+                      # Check if first part has flags
+                      first_part = parts[0]
+                      if isinstance(first_part, str) and ':' in first_part:
+                          # Has flags: preserve for both top and bottom
+                          base_id, flags = first_part.split(':')
+                          base_int = int(base_id)
+                          parts.append(f"{base_int + 0x10}:{flags}")
+                      else:
+                          # No flags: simple offset
+                          parts.append(start + 0x10)
+                  else:
+                      # Padding for remaining slots
+                      current_len = len(parts)
+                      for k in range(current_len, req_len):
+                          parts.append(start + 0x10 * k)
              else: # 16x16
-                  parts = [start, start+1, start+0x10, start+0x11]
+                  # 0, 1, 10, 11 logic
+                  offsets = [0, 1, 0x10, 0x11]
+                  current_len = len(parts)
+                  for k in range(current_len, req_len):
+                      parts.append(start + offsets[k])
+                      
         self.picker_sub_vals = parts[:req_len]
         
         # 2. Show Composition UI
@@ -414,7 +509,32 @@ class MappingTab:
         self.sub_picker_frame = ctk.CTkFrame(self.middle_frame, fg_color=Theme.BG_COLOR_2, border_width=1, border_color="#404040")
         self.sub_picker_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(10, 0)) # Insert between graphics and grid
         
+        # Close Button
+        btn_close = ctk.CTkButton(self.sub_picker_frame, text="✖", width=20, height=20, 
+                                  fg_color="transparent", hover_color=Theme.BTN_DANGER,
+                                  text_color="gray",
+                                  command=self.cancel_picker)
+        btn_close.place(relx=1.0, rely=0.0, anchor="ne", x=-2, y=2)
+        
         ctk.CTkLabel(self.sub_picker_frame, text="Composite Picker", font=("Arial", 11, "bold")).pack(pady=2)
+
+        # Mirror Options Frame
+        opts_frame = ctk.CTkFrame(self.sub_picker_frame, fg_color="transparent")
+        opts_frame.pack(pady=2)
+        
+        self.check_flip_x_var = ctk.BooleanVar()
+        self.check_flip_y_var = ctk.BooleanVar()
+        
+        self.chk_flip_x = ctk.CTkCheckBox(opts_frame, text="Flip X", variable=self.check_flip_x_var, 
+                                          width=60, height=20, font=("Arial", 11),
+                                          command=self.update_sub_flags)
+        self.chk_flip_x.pack(side="left", padx=5)
+        
+        self.chk_flip_y = ctk.CTkCheckBox(opts_frame, text="Flip Y", variable=self.check_flip_y_var, 
+                                          width=60, height=20, font=("Arial", 11),
+                                          command=self.update_sub_flags)
+        self.chk_flip_y.pack(side="left", padx=5)
+        
         
         # Container for composition buttons
         comp_container = ctk.CTkFrame(self.sub_picker_frame, fg_color="transparent")
@@ -487,6 +607,85 @@ class MappingTab:
                   btn.configure(fg_color=Theme.BTN_PRIMARY, border_color="white", border_width=1)
              else:
                   btn.configure(fg_color=Theme.BTN_SECONDARY, border_width=0)
+        
+        # Update checkbox states based on selected sub-tile logic
+        if idx is not None and idx < len(self.picker_sub_vals):
+            val = self.picker_sub_vals[idx]
+            # Val can be int or string "ID:flags"
+            flags = ""
+            if isinstance(val, str) and ':' in val:
+                flags = val.split(':')[1]
+            
+            self.check_flip_x_var.set('x' in flags)
+            self.check_flip_y_var.set('y' in flags)
+            
+            # Enable checkboxes
+            self.chk_flip_x.configure(state="normal")
+            self.chk_flip_y.configure(state="normal")
+        else:
+            # Block mode or invalid index
+            self.check_flip_x_var.set(False)
+            self.check_flip_y_var.set(False)
+             # Disable checkboxes if in block mode (simplification, or allow global flip?)
+             # Let's disable for Block mode for now to focus on sub-tiles as requested
+            self.chk_flip_x.configure(state="disabled")
+            self.chk_flip_y.configure(state="disabled")
+
+    def update_sub_flags(self):
+        """Handle Checkbox toggles"""
+        idx = self.picker_sub_index
+        if idx is None or idx >= len(self.picker_sub_vals):
+            return
+
+        current_val = self.picker_sub_vals[idx]
+        
+        # Extract ID
+        if isinstance(current_val, str) and ':' in current_val:
+            base_id = int(current_val.split(':')[0])
+        else:
+            base_id = current_val # Assuming int
+            
+        # Build new flags
+        flags = ""
+        if self.check_flip_x_var.get(): flags += "x"
+        if self.check_flip_y_var.get(): flags += "y"
+        
+        # Construct new value
+        new_val = f"{base_id}"
+        if flags:
+            new_val += f":{flags}"
+        else:
+            new_val = base_id # Revert to int if no flags? Or keep standard
+            
+        self.picker_sub_vals[idx] = new_val
+        
+        # Update Entry
+        # Format list back to string
+        str_vals = []
+        for v in self.picker_sub_vals:
+            if isinstance(v, str):
+                parts = v.split(':')
+                # parts[0] is the ID, try to parse it
+                try:
+                    h = f"{int(parts[0]):03X}"
+                except ValueError:
+                    # If already a hex string like "280", use as-is
+                    h = parts[0]
+                if len(parts) > 1 and parts[1]:
+                    str_vals.append(f"{h}:{parts[1]}")
+                else:
+                    str_vals.append(h)
+            else:
+                 str_vals.append(f"{v:03X}")
+                 
+        start_cursor = self.picker_target.index("insert")
+        self.picker_target.delete(0, "end")
+        self.picker_target.insert(0, ", ".join(str_vals))
+        
+        # Trigger update (which validates mapping)
+        char = [k for k, v in self.entries.items() if v == self.picker_target][0]
+        self.update_mapping(char, self.picker_target)
+
             
     def update_mapping(self, char, entry):
         val = entry.get().strip()
@@ -531,7 +730,18 @@ class MappingTab:
                  parts = val.split(',')
                  for p in parts:
                      if p.strip():
-                        ids.append(int(p.strip(), 16))
+                        # Store as is (string or flags) to pass to get_crop, 
+                        # but we need logic for generation below usually expecting ints?
+                        # The logic below checks for lists of IDs.
+                        # Let's keep it robust.
+                        # If has flags, keep as string. If not, can be int for math logic.
+                        if ':' in p:
+                            ids.append(p.strip())
+                        else:
+                            try:
+                                ids.append(int(p.strip(), 16))
+                            except:
+                                ids.append(0)
                  
                  # Create composite image
                  if not ids:
@@ -544,11 +754,25 @@ class MappingTab:
                  # Case 3: 16x16 -> Expect 4 IDs (TL, TR, BL, BR). If 1 ID, calculate standard block logic.
                  
                  # Create blank canvas for icon
-                 from PIL import Image
+                 from PIL import Image, ImageOps # Import ImageOps here
                  composite = Image.new("RGB", (icon_w, icon_h), (0, 0, 0))
                  
                  # Helper to get crop
-                 def get_crop(tid):
+                 def get_crop(tid_or_str):
+                     # Handle "ID:flags"
+                     tid = tid_or_str
+                     flags = ""
+                     if isinstance(tid_or_str, str) and ':' in tid_or_str:
+                         p = tid_or_str.split(':')
+                         try:
+                             tid = int(p[0], 16)
+                         except:
+                             tid = 0
+                         flags = p[1]
+                     elif isinstance(tid_or_str, str): # Plain hex string possibly
+                         try: tid = int(tid_or_str, 16)
+                         except: tid = int(tid_or_str)
+                         
                      local_idx = tid - base_offset
                      if 0 <= local_idx < (len(self.raw_pixels)//64):
                          row = local_idx // w_tiles
@@ -556,7 +780,11 @@ class MappingTab:
                          px = 8 * scale
                          x = col * px
                          y = row * px
-                         return self.full_pil_img.crop((x, y, x+px, y+px))
+                         crop = self.full_pil_img.crop((x, y, x+px, y+px))
+                         
+                         if 'x' in flags: crop = ImageOps.mirror(crop)
+                         if 'y' in flags: crop = ImageOps.flip(crop)
+                         return crop
                      return None
 
                  # Draw Logic
@@ -579,7 +807,11 @@ class MappingTab:
                      if len(ids) >= 2:
                          t2 = ids[1]
                      else:
-                         t2 = t1 + 0x10 # Fallback standard (Vertical offset)
+                         # Calculate from top tile (handle both int and string with flags)
+                         if isinstance(t1, int):
+                             t2 = t1 + 0x10
+                         else:
+                             t2 = t1  # If complex string, just use as-is
                      
                      crop2 = get_crop(t2)
                      if crop2: composite.paste(crop2, (0, px))
@@ -595,15 +827,22 @@ class MappingTab:
                          # Explicit 4 tiles
                          t2, t3, t4 = ids[1], ids[2], ids[3]
                      elif len(ids) == 2:
-                         # Smart 2-Row Mode: top-row start, bottom-row start
-                         # TL=ids[0], TR=ids[0]+1
-                         # BL=ids[1], BR=ids[1]+1
-                         t2 = t1 + 1      # TR
-                         t3 = ids[1]      # BL
-                         t4 = ids[1] + 1  # BR
+                         # Smart 2-Row Mode with potential flags?
+                         # Only do math if ints.
+                         if isinstance(t1, int) and isinstance(ids[1], int):
+                             t2 = t1 + 1      # TR
+                             t3 = ids[1]      # BL
+                             t4 = ids[1] + 1  # BR
+                         else:
+                             # Can't math flags strings easily.
+                             # If mixed, just use what we have or duplicate
+                             t2, t3, t4 = t1, ids[1], ids[1]
                      else:
                          # Fallback standard 16x16 block
-                         t2, t3, t4 = t1+1, t1+0x10, t1+0x11
+                         if isinstance(t1, int):
+                             t2, t3, t4 = t1+1, t1+0x10, t1+0x11
+                         else:
+                             t2, t3, t4 = t1, t1, t1 # Fail safe
                      
                      c2 = get_crop(t2) # TR
                      if c2: composite.paste(c2, (px, 0))
@@ -625,6 +864,12 @@ class MappingTab:
                  self.icon_labels[char].configure(image=None)
 
     def save_mapping(self):
+        # Force sync from UI to Mapper before saving
+        for char, entry in self.entries.items():
+             val = entry.get().strip()
+             if val:
+                 self.mapper.set_mapping(char, val)
+                 
         filepath = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")])
         if filepath:
             self.mapper.save_mappings(filepath)
@@ -634,7 +879,12 @@ class MappingTab:
         if filepath:
             success, msg = self.mapper.load_mappings(filepath)
             if success:
+                self.current_mapping_name = os.path.basename(filepath)
+                self.lbl_mapping_status.configure(text=f"Mapping: {self.current_mapping_name}", text_color=Theme.BTN_PRIMARY)
                 self.populate_grid()
+            else:
+                from tkinter import messagebox
+                messagebox.showerror("Error", msg)
 
     def load_palette(self):
         filename = filedialog.askopenfilename(filetypes=[("SNES Palette", "*.bin;*.pal;*.tpl")])
@@ -652,6 +902,17 @@ class MappingTab:
         except Exception as e:
             from tkinter import messagebox
             messagebox.showerror("Error", f"Failed to load palette: {e}")
+
+    def refresh_from_external(self, filename=None, status="Custom"):
+        """Called by other tabs (CreditsTab) when mapping is changed externally."""
+        if filename:
+            self.current_mapping_name = filename
+            self.lbl_mapping_status.configure(text=f"Mapping: {filename}", text_color=Theme.BTN_PRIMARY)
+        elif status == "Default (RHR)":
+            self.current_mapping_name = None
+            self.lbl_mapping_status.configure(text="Mapping: Default (RHR)", text_color=Theme.TEXT_SUCCESS)
+        
+        self.populate_grid()
 
     def load_graphics(self):
         filename = filedialog.askopenfilename(filetypes=[("SNES Graphics", "*.bin;*.gfx")])
@@ -855,8 +1116,26 @@ class MappingTab:
                      if 0 <= idx < len(self.picker_sub_vals):
                           self.picker_sub_vals[idx] = final_id
                      
-                     # Construct comma-string
-                     new_val = ",".join([f"{x:03X}" for x in self.picker_sub_vals])
+                     # Construct comma-string (handle both ints and strings with flags)
+                     formatted_vals = []
+                     for x in self.picker_sub_vals:
+                         if isinstance(x, str):
+                             # Already has flags or is a hex string
+                             if ':' in x:
+                                 parts = x.split(':')
+                                 try:
+                                     formatted_vals.append(f"{int(parts[0]):03X}:{parts[1]}")
+                                 except:
+                                     formatted_vals.append(x)
+                             else:
+                                 try:
+                                     formatted_vals.append(f"{int(x, 16):03X}")
+                                 except:
+                                     formatted_vals.append(x)
+                         else:
+                             formatted_vals.append(f"{x:03X}")
+                     
+                     new_val = ", ".join(formatted_vals)
                      
                      self.picker_target.delete(0, "end")
                      self.picker_target.insert(0, new_val)
@@ -871,6 +1150,23 @@ class MappingTab:
                 self.picker_target.delete(0, "end")
                 self.picker_target.insert(0, hex_id)
                 self.picker_target.event_generate("<FocusOut>")
+                
+                # CRITICAL FIX: Update sub_vals to match this new block
+                # So if user switches to a sub-picker later, they edit THIS block, not the old one.
+                if tile_size == "8x16":
+                     self.picker_sub_vals = [final_id, final_id + 0x10] # Vertical Logic (or +1 depending on arrangement?) 
+                     # Wait, standard layout for 8x16 is often vertical? 
+                     # Check get_crop logic: t2 = t1 + 0x10. Yes.
+                     # But Map16 logic might differ. 
+                     # Let's trust get_crop logic: t2 = t1 + 0x10.
+                     pass 
+                elif tile_size == "16x16":
+                     # Standard 16x16: TL, TR, BL, BR
+                     # TL=id, TR=id+1, BL=id+0x10, BR=id+0x11
+                     self.picker_sub_vals = [final_id, final_id+1, final_id+0x10, final_id+0x11]
+                else:
+                     self.picker_sub_vals = [final_id]
+
                 # Reset picker mode
                 self.cancel_picker()
                 # Trigger icon update immediately
