@@ -10,3 +10,4 @@ app.log
 smwprojects/
 dist/
 build/
+debug_archive/
