@@ -141,8 +141,26 @@ class CreditsTab:
         self.txt_credits_input = ctk.CTkTextbox(self.content_area)
         # Note: We grid/pack this in toggle
 
-        # Hints
-        self.lbl_file_hint = ctk.CTkLabel(self.content_area, text="💡 Supports: .txt (1 author/line) or .json (SMW Credits Manager)", text_color=Theme.TEXT_DIM, font=("Arial", 11), anchor="nw")
+        # Hints - Create frame with clickable link
+        self.hint_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        
+        # Create labels for the hint text with clickable link
+        lbl_hint_1 = ctk.CTkLabel(self.hint_frame, text="💡 Supports: .txt (1 author/line) or .json (", 
+                                  text_color=Theme.TEXT_DIM, font=("Arial", 11))
+        lbl_hint_1.pack(side="left")
+        
+        # Clickable link label
+        self.lbl_link = ctk.CTkLabel(self.hint_frame, text="Saphros SMW Credits Manager", 
+                                      text_color="#4A9EFF", font=("Arial", 11, "underline"),
+                                      cursor="hand2")
+        self.lbl_link.pack(side="left")
+        self.lbl_link.bind("<Button-1>", lambda e: self.open_credits_manager_link())
+        
+        # Closing parenthesis
+        lbl_hint_2 = ctk.CTkLabel(self.hint_frame, text=")", 
+                                  text_color=Theme.TEXT_DIM, font=("Arial", 11))
+        lbl_hint_2.pack(side="left")
+
         
         self.toggle_source_mode("File")
 
@@ -308,16 +326,22 @@ class CreditsTab:
             self.path_entry.delete(0, "end")
             self.path_entry.insert(0, file)
             
+    def open_credits_manager_link(self):
+        """Opens the Saphros SMW Credits Manager website in the default browser."""
+        import webbrowser
+        webbrowser.open("https://saphros.de/smwcredits/")
+        self.log("Opened Saphros SMW Credits Manager in browser.")
+    
     def toggle_source_mode(self, mode):
-        # inputs are: self.frm_file_inputs (grid in toolbar), self.txt_credits_input (pack in content), self.lbl_file_hint (pack in content)
+        # inputs are: self.frm_file_inputs (grid in toolbar), self.txt_credits_input (pack in content), self.hint_frame (pack in content)
         
         if mode == "File":
             self.frm_file_inputs.grid() # Restore
             self.txt_credits_input.pack_forget()
-            self.lbl_file_hint.pack(anchor="nw", pady=(5,0))
+            self.hint_frame.pack(anchor="nw", pady=(5,0))
         else:
             self.frm_file_inputs.grid_remove()
-            self.lbl_file_hint.pack_forget()
+            self.hint_frame.pack_forget()
             self.txt_credits_input.pack(fill="both", expand=True)
 
     def log(self, message):

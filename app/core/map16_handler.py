@@ -719,7 +719,18 @@ class Map16Generator:
                   val_tl = t_tl
                   val_tr, val_bl, val_br = None, None, None
                   
-                  if len(parts) >= 4:
+                  # Helper to check if a tile ID is blank
+                  def is_blank(v):
+                       tid, _, _, _ = get_id_and_flags(v)
+                       try: return int(tid, 16) == int(self.blank_tile_id, 16)
+                       except: return False
+                  
+                  # If the primary tile is blank, all sub-tiles should be blank
+                  if is_blank(val_tl):
+                       val_tr = self.blank_tile_id
+                       val_bl = self.blank_tile_id
+                       val_br = self.blank_tile_id
+                  elif len(parts) >= 4:
                        val_tr = parts[1]
                        val_bl = parts[2]
                        val_br = parts[3]

@@ -8,3 +8,5 @@ venv/
 .vscode/
 app.log
 smwprojects/
+dist/
+build/
