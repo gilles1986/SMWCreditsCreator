@@ -1,58 +1,77 @@
 # SMW Credits Creator
 
-Eine Python Desktop-Anwendung zum Verwalten von Tile-to-Character Mappings für Super Mario World Credits (Lunar Magic), optimiert für RHR (ROM Hack Resources) Baseroms (v5.10+).
+A Python desktop application for managing Tile-to-Character Mappings for Super Mario World Credits (Lunar Magic), optimized for RHR (ROM Hack Resources) Baseroms (v5.10+).
 
-## Voraussetzungen
+## Features
 
-- **Windows** (Die Anwendung ist als Windows-only ausgelegt)
-- **Python 3.8+** muss installiert sein.
+- **Project Validation**: Automatically checks if the selected folder is a valid RHR project.
+- **Config Fix**: Detects and fixes missing settings in `exports.toml` (specifically `use_text_map16_format`).
+- **Mapping Editor**: Easily assign Hex IDs to characters with a visual interface. Save and load mappings as JSON.
+- **Map16 Generation**: Generates `.map16` files compatible with Lunar Magic's 16x16 Tile Map Editor.
+- **Custom Font Support**: Supports 8x8, 8x16, and 16x16 tile sizes.
+- **Integration**: Import credits directly from Saphros SMW Credits Manager files (.json).
 
-## Installation für Entwickler
+## Requirements
 
-1. **Repository klonen**
+- **Windows** (The application is designed for Windows)
+- **Python 3.8+** must be installed.
+
+## Installation for Developers
+
+1. **Clone the Repository**
    ```bash
    git clone <repository-url>
    cd SMWCreditsCreator
    ```
 
-2. **Virtuelle Umgebung erstellen (Empfohlen)**
-   Es wird empfohlen, eine virtuelle Umgebung zu nutzen, um Abhängigkeiten isoliert zu halten.
+2. **Create a Virtual Environment (Recommended)**
+   It is recommended to use a virtual environment to keep dependencies isolated.
    ```bash
    python -m venv venv
    .\venv\Scripts\activate
    ```
 
-3. **Abhängigkeiten installieren**
-   Installiere die benötigten Pakete aus der `requirements.txt`:
+3. **Install Dependencies**
+   Install the required packages from `requirements.txt`:
    ```bash
    pip install -r requirements.txt
    ```
 
-   **Haupt-Abhängigkeiten:**
-   - `customtkinter`: Für das moderne UI.
-   - `toml`: Zum Parsen und Bearbeiten der `exports.toml` Konfigurationsdateien.
+   **Main Dependencies:**
+   - `customtkinter`: For the modern UI.
+   - `toml`: For parsing and editing `exports.toml` configuration files.
+   - `Pillow`: For image processing.
+   - `pygame`: For audio/input handling (if used).
+   - `pyinstaller`: For building the executable.
 
-## Starten der Anwendung
+## Running the Application
 
-Um die Anwendung zu starten, führe `main.py` aus:
+To start the application, run `main.py`:
 ```bash
 python main.py
 ```
 
-## Entwicklung
+## Building the Executable
 
-### Projektstruktur
-- `app/core/`: Enthält die Logik (Validator, ConfigManager, Mapper).
-- `app/ui/`: Enthält die GUI-Komponenten (Fenster, Tabs).
-- `tests/`: Enthält Unit-Tests.
+To create a standalone `.exe` file for distribution:
 
-### Tests ausführen
-Um sicherzustellen, dass alles korrekt funktioniert (besonders nach Änderungen), führe die Tests aus:
+1. Ensure all dependencies are installed (including `pyinstaller`).
+2. Run the build script:
+   ```bash
+   python build_exe.py
+   ```
+3. The executable will be created in the `dist` folder.
+   - The script automatically bundles necessary resources (like `palette.pal`, `user_manual.html`, etc.) into the `dist` folder.
+
+## Development
+
+### Project Structure
+- `app/core/`: Contains core logic (Validator, ConfigManager, Mapper, Map16Handler).
+- `app/ui/`: Contains GUI components (Windows, Tabs).
+- `tests/`: Contains unit tests.
+
+### Running Tests
+To ensure everything works correctly (especially after changes), run the tests:
 ```bash
 python -m unittest discover tests
 ```
-
-## Features
-- **Projekt Validierung**: Prüft automatisch, ob der gewählte Ordner ein valides RHR Projekt ist.
-- **Config Fix**: Erkennt und behebt fehlende Einstellungen in `exports.toml` (`use_text_map16_format`).
-- **Mapping Editor**: Einfaches Zuweisen von Hex-IDs zu Buchstaben. Speichern und Laden als JSON.
