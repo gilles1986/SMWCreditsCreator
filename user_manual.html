@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMW Credits Tool - Manual</title>
+    <title>SMW Credits Creator - Manual</title>
     <style>
         :root {
             --primary: #2c3e50;
@@ -101,82 +101,124 @@
 
 <body>
     <div class="container">
-        <h1>SMW Credits Tool <small style="font-size:0.5em; color:#7f8c8d;">v2.0</small></h1>
+        <h1>SMW Credits Creator <small style="font-size:0.5em; color:#7f8c8d;">v1.0</small></h1>
         <p style="text-align: center;">Generate Map16 Credit Tiles for Lunar Magic easily.</p>
 
         <nav>
             <ul>
-                <li><a href="#mapping">1. Mapping</a></li>
-                <li><a href="#credits">2. Credits & Settings</a></li>
-                <li><a href="#export">3. Export & Import</a></li>
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#credits">Credits Tab</a></li>
+                <li><a href="#mapping">Mapping Tab</a></li>
+                <li><a href="#export">Export &amp; Import</a></li>
             </ul>
         </nav>
 
-        <section id="mapping">
-            <h2>1. Character Mapping</h2>
-            <p>Define which Graphic Tile ID (ExGFX) corresponds to which Text Character.</p>
+        <!-- Overview -->
+        <section id="overview">
+            <h2>Overview</h2>
+            <p>The <strong>SMW Credits Creator</strong> converts a list of contributor names into Map16 tiles that can be imported directly into Lunar Magic. The application has two main tabs:</p>
             <ul>
-                <li><strong>Load Graphics:</strong> Load your <code>.bin</code> graphics file to see the tiles.</li>
-                <li><strong>Pick Tiles:</strong> Click the target <span class="btn">🎯</span> icon and select a tile on
-                    the image.</li>
-                <li><strong>Preview:</strong> The tool shows you exactly how the character will look.</li>
+                <li><strong>Credits</strong> — Set up your text source, appearance options, Map16 settings, and generate the output file.</li>
+                <li><strong>Mapping</strong> — Define or edit which graphic tile IDs correspond to each text character, load ExGFX graphics, and pick tiles visually.</li>
             </ul>
-            <div class="tip"><strong>Auto-Load:</strong> Place <code>palette.pal</code> in the tool folder to load
-                colors automatically.</div>
         </section>
 
+        <!-- Credits Tab -->
         <section id="credits">
-            <h2>2. Credits & Settings</h2>
-            <p>Go to the <strong>Credits Tab</strong> to set up your text.</p>
+            <h2>Credits Tab</h2>
+            <p>This is where you configure <em>what</em> to generate and <em>how</em> it should look.</p>
 
-            <h3>Source Input</h3>
+            <h3>1. Credits Content</h3>
+            <p>Choose how your contributor names are provided:</p>
             <ul>
-                <li><strong>File Mode:</strong> Load a <code>.txt</code> or <code>.json</code> file.</li>
-                <li><strong>Direct Text:</strong> Paste your list of names directly into the text box.</li>
-            </ul>
-
-            <h3>Options</h3>
-            <ul>
-                <li><strong>Optimize Columns:</strong> Automatically fits two short names into one row (Side-by-Side).
+                <li><strong>File</strong> — Select a file via <em>Browse…</em>. Supported formats:
+                    <ul>
+                        <li><code>.txt</code> — One author per line.</li>
+                        <li><code>.json</code> — Exported from <a href="https://saphros.de/smwcredits/" target="_blank">Saphros SMW Credits Manager</a>.</li>
+                    </ul>
                 </li>
-                <li><strong>Capitalize Text:</strong> <span class="btn">New!</span> Check this to convert ALL text to
-                    <strong>UPPERCASE</strong> automatically.</li>
-                <li><strong>Tile Size:</strong> Choose <code>8x8</code>, <code>8x16</code> (Tall), or <code>16x16</code>
-                    (Full Block).</li>
+                <li><strong>Direct Text</strong> — Paste names directly into the text box (one per line).</li>
+            </ul>
+            <div class="tip">Switch between <strong>File</strong> and <strong>Direct Text</strong> mode using the toggle button at the top of the section.</div>
+
+            <h3>2. Appearance &amp; Font</h3>
+            <ul>
+                <li><strong>Font Mapping</strong> — Shows which mapping file is loaded. Use <em>Load Mapping (.json)</em> to load a custom one, or <em>↺</em> to reset to defaults.</li>
+                <li><strong>Capitalize Text</strong> — Converts all text to UPPERCASE automatically.</li>
+                <li><strong>Optimize Columns</strong> — Fits two short names side-by-side into one row.</li>
+                <li><strong>Add Empty Line After Section</strong> — Inserts a blank row between credit sections.</li>
+                <li><strong>Font Size</strong> — Choose <code>8x8</code>, <code>8x16</code> (tall), or <code>16x16</code> (full block).</li>
             </ul>
 
-            <h3>Map16 Settings</h3>
+            <h3>3. Map16 Settings</h3>
             <ul>
-                <li><strong>Start Page:</strong> Hex number of the Map16 page to overwrite (e.g. <code>14</code> for
-                    Page 0x14).</li>
-                <li><strong>Act As:</strong> The behavior of the tiles (e.g. <code>25</code> for air/solid).</li>
+                <li><strong>Blank Tile ID</strong> — The tile used for empty space (default: <code>0F8</code>).</li>
+                <li><strong>Act As</strong> — The tile behavior, e.g. <code>0025</code> = Air, <code>0130</code> = Cement, <code>002B</code> = Coin.</li>
+                <li><strong>Start Page (Hex)</strong> — The Map16 page where tiles begin (e.g. <code>60</code>).</li>
+                <li><strong>Priority (On Top)</strong> — Renders tiles on top of sprites.</li>
+                <li><strong>Section Order</strong> — Controls the order of credit sections:
+                    <ul>
+                        <li><code>predefined</code> — Fixed order (Sprites, UberASM, …).</li>
+                        <li><code>alphabetical</code> — Sorted A–Z.</li>
+                        <li><code>none</code> — File order as-is.</li>
+                    </ul>
+                </li>
             </ul>
+
+            <h3>Output</h3>
+            <p>Click <strong>Save .map16</strong> to generate the Map16 file. Progress and status messages appear in the <strong>Output Log</strong> at the bottom.</p>
         </section>
 
+        <!-- Mapping Tab -->
+        <section id="mapping">
+            <h2>Mapping Tab</h2>
+            <p>Defines which ExGFX tile ID corresponds to which text character.</p>
+
+            <h3>Character Map</h3>
+            <ul>
+                <li>The left column lists every character and its current tile ID(s).</li>
+                <li>Click the <span class="btn">🎯</span> target icon next to a character, then click a tile in the graphics preview to assign it.</li>
+                <li>Use <span class="btn">⇄ BG3</span> to convert all IDs between BG3/non-BG3 format.</li>
+                <li>Press <span class="btn">ℹ</span> for a quick-reference of the mapping format.</li>
+            </ul>
+
+            <h3>Graphics Preview</h3>
+            <ul>
+                <li><strong>Load Graphics (.bin)</strong> — Load your ExGFX binary file to see and pick tiles.</li>
+                <li><strong>Load Palette (.bin)</strong> — Load a palette file for correct colors. You can also select a palette row (0–7).</li>
+            </ul>
+            <div class="tip"><strong>Auto-Load:</strong> Place a file named <code>palette.pal</code> in the tool folder to load colors automatically on start.</div>
+
+            <h3>Configuration</h3>
+            <p>The Mapping tab also shows the shared configuration values (Act As, Start Page, Tile Size, Palette, Priority) so you can adjust them from either tab — changes are synced.</p>
+        </section>
+
+        <!-- Export & Import -->
         <section id="export">
-            <h2>3. Export & Import</h2>
+            <h2>Export &amp; Import into Lunar Magic</h2>
+
             <h3>Generating the File</h3>
             <ol>
-                <li>Click <strong>Save .map16</strong>.</li>
-                <li>Choose a filename (e.g. <code>credits.map16</code>).</li>
-                <li>The tool generates a file compatible with Lunar Magic.</li>
+                <li>Go to the <strong>Credits</strong> tab.</li>
+                <li>Set your source (file or direct text) and adjust settings.</li>
+                <li>Click <strong>Save .map16</strong> and choose a filename.</li>
             </ol>
 
             <h3>Importing into Lunar Magic</h3>
-            <div class="note"><strong>Important:</strong> The file contains the target page information!</div>
+            <div class="note"><strong>Important:</strong> The generated file contains the target page information, so tiles are placed on the correct page automatically.</div>
             <ol>
                 <li>Open <strong>Lunar Magic</strong>.</li>
-                <li>Open the <strong>16x16 Tile Map Editor</strong> <span class="btn">🍃</span>.</li>
-                <li>Navigate to the page you selected (e.g. Page 0x14).</li>
-                <li>Press <strong>F3</strong> (or File > Import Map16).</li>
-                <li>Select your generated file.</li>
+                <li>Open the <strong>16×16 Tile Map Editor</strong>.</li>
+                <li>Navigate to the page you selected (e.g. Page 0x60).</li>
+                <li>Press <strong>F3</strong> (or File → Import Map16).</li>
+                <li>Select your generated <code>.map16</code> file.</li>
             </ol>
-            <p>The tiles should appear instantly on the selected page!</p>
+            <p>The tiles should appear instantly on the selected page.</p>
         </section>
 
     </div>
     <footer style="text-align:center; margin-top:50px; color:#aaa;">
-        &copy; 2026 Credits Tool
+        &copy; 2026 SMW Credits Creator — by Saphros
     </footer>
 </body>
 

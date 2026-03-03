@@ -108,25 +108,24 @@ class CreditsTab:
         # Toolbar Header (Toggle + File Input)
         toolbar = ctk.CTkFrame(sec1, fg_color="transparent")
         toolbar.pack(fill="x", padx=10, pady=(5, 5))
-        toolbar.grid_columnconfigure(1, weight=1) # Entry grows
+        toolbar.grid_columnconfigure(0, weight=1)
         
         # Toggle
         self.src_mode_var = ctk.StringVar(value="file")
         self.seg_mode = ctk.CTkSegmentedButton(toolbar, values=["File", "Direct Text"], 
                                                variable=self.src_mode_var, 
-                                               command=self.toggle_source_mode,
-                                               width=150)
-        self.seg_mode.grid(row=0, column=0, padx=(0, 10))
+                                               command=self.toggle_source_mode)
+        self.seg_mode.grid(row=0, column=0, sticky="ew")
         self.seg_mode.set("File")
 
         # File Inputs (Grouped for hiding)
         self.frm_file_inputs = ctk.CTkFrame(toolbar, fg_color="transparent")
-        self.frm_file_inputs.grid(row=0, column=1, sticky="ew")
+        self.frm_file_inputs.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(5, 0))
         self.frm_file_inputs.grid_columnconfigure(0, weight=1)
 
         self.path_entry = ctk.CTkEntry(self.frm_file_inputs, placeholder_text="Path to credits file (.txt or .json)")
-        self.path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
-        ctk.CTkButton(self.frm_file_inputs, text="Browse...", width=80, command=self.browse_file).grid(row=0, column=1)
+        self.path_entry.grid(row=0, column=0, sticky="ew", pady=(8, 0))
+        ctk.CTkButton(self.frm_file_inputs, text="Browse...", width=100, command=self.browse_file).grid(row=1, column=0, sticky="w", pady=(5, 0))
         
         if self.credits_path:
             self.path_entry.insert(0, self.credits_path)
@@ -141,25 +140,24 @@ class CreditsTab:
         self.txt_credits_input = ctk.CTkTextbox(self.content_area)
         # Note: We grid/pack this in toggle
 
-        # Hints - Create frame with clickable link
+        # Hints - Supported Formats
         self.hint_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
-        
-        # Create labels for the hint text with clickable link
-        lbl_hint_1 = ctk.CTkLabel(self.hint_frame, text="💡 Supports: .txt (1 author/line) or .json (", 
-                                  text_color=Theme.TEXT_DIM, font=("Arial", 11))
-        lbl_hint_1.pack(side="left")
-        
-        # Clickable link label
-        self.lbl_link = ctk.CTkLabel(self.hint_frame, text="Saphros SMW Credits Manager", 
-                                      text_color="#4A9EFF", font=("Arial", 11, "underline"),
-                                      cursor="hand2")
+
+        ctk.CTkLabel(self.hint_frame, text="💡 Supported Formats:",
+                     text_color=Theme.TEXT_DIM, font=("Arial", 13, "bold")).pack(anchor="w", pady=(0, 3))
+
+        ctk.CTkLabel(self.hint_frame, text="  •  Textfile (.txt)",
+                     text_color=Theme.TEXT_DIM, font=("Arial", 12)).pack(anchor="w")
+
+        hint_json_row = ctk.CTkFrame(self.hint_frame, fg_color="transparent")
+        hint_json_row.pack(anchor="w", fill="x")
+        ctk.CTkLabel(hint_json_row, text="  •  ",
+                     text_color=Theme.TEXT_DIM, font=("Arial", 12)).pack(side="left")
+        self.lbl_link = ctk.CTkLabel(hint_json_row, text="SMW Credits Manager json-File",
+                                     text_color="#4A9EFF", font=("Arial", 12, "underline"),
+                                     cursor="hand2")
         self.lbl_link.pack(side="left")
         self.lbl_link.bind("<Button-1>", lambda e: self.open_credits_manager_link())
-        
-        # Closing parenthesis
-        lbl_hint_2 = ctk.CTkLabel(self.hint_frame, text=")", 
-                                  text_color=Theme.TEXT_DIM, font=("Arial", 11))
-        lbl_hint_2.pack(side="left")
 
         
         self.toggle_source_mode("File")
@@ -235,25 +233,50 @@ class CreditsTab:
         self.ent_blank.grid(row=0, column=1, sticky="w", padx=5, pady=5)
         self.ent_blank.insert(0, blank_def)
 
-        act_as_def = self.config.get("act_as", "0025 (Air)")
+        act_as_def = self.config.get("act_as", "0025")
+        # Normalize: strip any trailing description like "0025 (Air)" -> "0025"
+        if isinstance(act_as_def, str) and " " in act_as_def:
+            act_as_def = act_as_def.split()[0]
         ctk.CTkLabel(map16_grid, text="Act As:").grid(row=0, column=2, sticky="e", padx=10, pady=5)
-        self.act_as_var = ctk.StringVar(value=act_as_def)
-        self.opt_act_as = ctk.CTkOptionMenu(map16_grid, variable=self.act_as_var, 
-                                            values=["0025 (Air)", "0130 (Cement)", "002B (Coin)"], 
-                                            command=lambda _: self.save_config(), width=120)
-        self.opt_act_as.grid(row=0, column=3, sticky="w", padx=5, pady=5)
+        act_as_frame = ctk.CTkFrame(map16_grid, fg_color="transparent")
+        act_as_frame.grid(row=0, column=3, sticky="w", padx=5, pady=5)
+        self.ent_act_as = ctk.CTkEntry(act_as_frame, width=70, placeholder_text="0025")
+        self.ent_act_as.insert(0, act_as_def)
+        self.ent_act_as.pack(side="left")
+        ctk.CTkLabel(act_as_frame, text="(0025=Air  0130=Cement  002B=Coin)",
+                     text_color=Theme.TEXT_DIM, font=("Arial", 10)).pack(side="left", padx=(5, 0))
+        self.ent_act_as.bind("<FocusOut>", lambda _: self.save_config())
 
-        # Row 2: Priority + Start Page
+        # Row 1 (right): Start Page under Act As
+        ctk.CTkLabel(map16_grid, text="Start Page (Hex):").grid(row=1, column=2, sticky="e", padx=10, pady=5)
+        start_page_def = self.config.get("start_page", 0x60)
+        page_frame = ctk.CTkFrame(map16_grid, fg_color="transparent")
+        page_frame.grid(row=1, column=3, sticky="w", padx=5, pady=5)
+        self.ent_start_page = ctk.CTkEntry(page_frame, width=60)
+        self.ent_start_page.pack(side="left")
+        ctk.CTkLabel(page_frame, text="(hex)",
+                     text_color=Theme.TEXT_DIM, font=("Arial", 10)).pack(side="left", padx=(5, 0))
+        self.ent_start_page.insert(0, f"{start_page_def:02X}")
+        self.ent_start_page.bind("<FocusOut>", lambda _: self.save_config())
+
+        # Row 1 (left): Priority
         priority_def = self.config.get("priority", False)
         self.priority_var = ctk.BooleanVar(value=priority_def)
         ctk.CTkCheckBox(map16_grid, text="Priority (On Top)", variable=self.priority_var, command=self.save_config).grid(row=1, column=0, columnspan=2, sticky="w", padx=20, pady=5)
 
-        ctk.CTkLabel(map16_grid, text="Start Page (Hex):").grid(row=1, column=2, sticky="e", padx=10, pady=5)
-        start_page_def = self.config.get("start_page", 0x60)
-        self.ent_start_page = ctk.CTkEntry(map16_grid, width=60)
-        self.ent_start_page.grid(row=1, column=3, sticky="w", padx=5, pady=5)
-        self.ent_start_page.insert(0, f"{start_page_def:02X}")
-        self.ent_start_page.bind("<FocusOut>", lambda _: self.save_config())
+        # Row 2: Section Order
+        sort_mode_def = self.config.get("sort_mode", "predefined")
+        ctk.CTkLabel(map16_grid, text="Section Order:").grid(row=2, column=0, sticky="e", padx=5, pady=5)
+        self.sort_mode_var = ctk.StringVar(value=sort_mode_def)
+        self.opt_sort_mode = ctk.CTkOptionMenu(
+            map16_grid, variable=self.sort_mode_var,
+            values=["predefined", "alphabetical", "none"],
+            command=lambda _: self.save_config(), width=120)
+        self.opt_sort_mode.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+
+        # Row 3: Section Order info text
+        ctk.CTkLabel(map16_grid, text="(predefined = Sprites/UberASM/…, alphabetical, none = file order)",
+                     text_color=Theme.TEXT_DIM, font=("Arial", 10)).grid(row=3, column=0, columnspan=4, sticky="w", padx=20, pady=(0, 5))
 
         # 3. Actions & Log
         action_frame = ctk.CTkFrame(self.view_container)
@@ -311,8 +334,10 @@ class CreditsTab:
         self.config.set("tile_size", self.font_size_var.get()) # Save as tile_size
         self.config.set("capitalize", self.chk_capitalize_var.get())
         # Map16 Settings
-        self.config.set("act_as", self.act_as_var.get())
+        act_as_val = self.ent_act_as.get().strip().split()[0] if self.ent_act_as.get().strip() else "0025"
+        self.config.set("act_as", act_as_val)
         self.config.set("priority", self.priority_var.get())
+        self.config.set("sort_mode", self.sort_mode_var.get())
         try:
             start_page = int(self.ent_start_page.get(), 16)
             self.config.set("start_page", start_page)
@@ -338,11 +363,11 @@ class CreditsTab:
         if mode == "File":
             self.frm_file_inputs.grid() # Restore
             self.txt_credits_input.pack_forget()
-            self.hint_frame.pack(anchor="nw", pady=(5,0))
+            self.hint_frame.pack(anchor="nw", pady=(10, 0), padx=5)
         else:
             self.frm_file_inputs.grid_remove()
             self.hint_frame.pack_forget()
-            self.txt_credits_input.pack(fill="both", expand=True)
+            self.txt_credits_input.pack(fill="both", expand=True, pady=(10, 0))
 
     def log(self, message):
         # Helper to log safely even if view changed (though usually log is in main view)
@@ -359,7 +384,8 @@ class CreditsTab:
     def _generate_tiles_internal(self):
         """Helper to generate tiles based on current settings."""
 
-        act_val = self.act_as_var.get().split()[0]
+        act_raw = self.ent_act_as.get().strip()
+        act_val = act_raw.split()[0] if act_raw else "0025"
         
         # Options
         options = {
@@ -369,7 +395,8 @@ class CreditsTab:
             "act_as": act_val,
             "palette": self.config.get("palette", 0),
             "priority": self.config.get("priority", False),
-            "font_size": self.config.get("tile_size", "8x8")
+            "font_size": self.config.get("tile_size", "8x8"),
+            "sort_mode": self.config.get("sort_mode", "predefined")
         }
         
         try:

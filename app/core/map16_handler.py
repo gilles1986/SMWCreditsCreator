@@ -209,16 +209,19 @@ class Map16Handler:
         full_header_hex = "4c4d31360001010061030100000000007000000040000000100000001000000000000000800000000001070000000000000000000000000000000000000000004c756e6172204d6167696320332e36312020a932303235204675536f59612020446566656e646572206f662052656c6db000000000080000b008000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
         header = bytearray(bytes.fromhex(full_header_hex))
         
-        # Patch Page Control Field (Offset 36 / 0x24)
-        # Analysis confirms this value is PageNum * 16 (0x10)
-        # e.g. Page 8 -> 0x80, Page 14 -> 0xE0
+        # Patch all page-related fields in the header.
+        # The template was built from a page-8 export (LM 3.61).
+        #
+        # LM reads byte117 directly as the import page number (no offset added).
+        # Template encoding for page 8:  offset36=0x0080 (=8*0x10), byte117=0x08, byte121=0x08
+        # => For any page: offset36 = page_num * 0x10, byte117 = page_num, byte121 = page_num
         try:
-             val = page_num * 16
-             struct.pack_into("<I", header, 36, val)
-             print(f"[DEBUG] Patched Offset 36 with 0x{val:X} for Page {page_num}")
+             struct.pack_into("<H", header, 36, (page_num * 0x10) & 0xFFFF)
+             header[117] = page_num & 0xFF
+             header[121] = page_num & 0xFF
+             logger.debug(f"Patched page header for page 0x{page_num:02X}: off36=0x{page_num*0x10:X}, byte117/121=0x{page_num:02X}")
         except Exception as e:
-             print(f"Header patch error: {e}")
-             pass 
+             logger.warning(f"Header patch error: {e}")
 
              
         data.extend(header)
@@ -544,15 +547,18 @@ class Map16Generator:
         
         optimize = options.get("optimize_columns", False)
         add_empty = options.get("add_empty_line", False)
+        sort_mode = options.get("sort_mode", "predefined")  # "predefined", "alphabetical", or "none"
         
         all_tiles = []
         
-        # Processing Order: predefined list or alphabetical keys?
-        # User listed: smwsprites, uberasm, smwblocks, smwgraphics, smwmusic
-        # Let's try to stick to a logical order if possible, or just alpha.
-        # Fixed order map
-        order = ["Sprites", "UberASM", "Blocks", "Graphics", "Music", "Patches", "Tools", "General"]
-        sections = sorted(credits_data.keys(), key=lambda k: order.index(k) if k in order else 99)
+        # Processing Order based on sort_mode
+        PREDEFINED_ORDER = ["Sprites", "UberASM", "Blocks", "Graphics", "Music", "Patches", "Tools", "General"]
+        if sort_mode == "alphabetical":
+            sections = sorted(credits_data.keys())
+        elif sort_mode == "none":
+            sections = list(credits_data.keys())
+        else:  # predefined (default)
+            sections = sorted(credits_data.keys(), key=lambda k: PREDEFINED_ORDER.index(k) if k in PREDEFINED_ORDER else 99)
         
         for section in sections:
             names = credits_data[section]

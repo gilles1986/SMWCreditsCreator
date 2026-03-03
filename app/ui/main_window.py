@@ -20,8 +20,19 @@ class MainWindow(ctk.CTk):
         
         # Create Tabs (3 tabs now: Credits, Mapping, Export)
         logger.info("MainWindow: Creating Tabview")
-        self.tab_view = ctk.CTkTabview(self)
+        self.tab_view = ctk.CTkTabview(
+            self,
+            segmented_button_fg_color="#1a1a2e",
+            segmented_button_selected_color="#1f6aa5",
+            segmented_button_selected_hover_color="#1a5889",
+            segmented_button_unselected_color="#2d2d3d",
+            segmented_button_unselected_hover_color="#3a3a4e",
+            text_color="#ffffff",
+            fg_color="#242424",
+        )
         self.tab_view.pack(fill="both", expand=True, padx=10, pady=10)
+        # Make tab buttons stretch full width
+        self.after(0, self._make_tabs_full_width)
         
         self.tab_credits = self.tab_view.add("Credits")
         self.tab_mapping = self.tab_view.add("Mapping")
@@ -42,6 +53,15 @@ class MainWindow(ctk.CTk):
 
         # Icon Setup - Defer to avoid hanging
         self.after(200, self.set_app_icon)
+
+    def _make_tabs_full_width(self):
+        try:
+            sb = self.tab_view._segmented_button
+            sb.master.grid_columnconfigure(0, weight=1)
+            sb.grid_configure(sticky="ew", padx=4)
+            sb.configure(height=36)
+        except Exception:
+            pass
 
     def set_app_icon(self):
         logger.info("MainWindow: setting icon (deferred)")

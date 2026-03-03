@@ -11,3 +11,4 @@ smwprojects/
 dist/
 build/
 debug_archive/
+.history
