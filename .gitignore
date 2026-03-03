@@ -10,5 +10,6 @@ app.log
 smwprojects/
 dist/
 build/
+*.spec
 debug_archive/
 .history
