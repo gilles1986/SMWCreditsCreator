@@ -1,5 +1,8 @@
 from PIL import Image
 import struct
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SNESGraphics:
     @staticmethod
@@ -114,7 +117,7 @@ class SNESGraphics:
                             colors.append((r, g, b))
                         except (ValueError, TypeError): pass
             except Exception as e:
-                print(f"JASC-PAL decode error: {e}")
+                logger.warning("JASC-PAL decode error: %s", e)
         
         # 2. Check for Binary RGB (3 bytes per color)
         # Common sizes: 768 (256 colors), 48 (16 colors)

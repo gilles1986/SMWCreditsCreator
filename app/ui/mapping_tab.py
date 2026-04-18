@@ -1,5 +1,6 @@
 import customtkinter as ctk
 import os
+import logging
 from tkinter import filedialog, messagebox
 from app.core.mapper import Mapper
 from app.core.validator import Validator
@@ -8,6 +9,8 @@ from app.core.app_config import AppConfig
 from app.core.snes_graphics import SNESGraphics
 from PIL import Image, ImageTk
 from app.ui.bulk_editor import BulkEditorWindow
+
+logger = logging.getLogger(__name__)
 
 class MappingTab:
     def __init__(self, master):
@@ -162,7 +165,7 @@ class MappingTab:
         if success:
              self.lbl_mapping_status.configure(text="Mapping: Default (RHR)", text_color=Theme.TEXT_SUCCESS)
         else:
-            print(f"Auto-load failed: {msg}") 
+            logger.warning("Auto-load failed: %s", msg) 
             
         # Try to load default palette
         self.load_default_palette()
@@ -194,12 +197,12 @@ class MappingTab:
                 with open(found_path, "rb") as f:
                      data = f.read()
                 self.loaded_palette = SNESGraphics.decode_palette(data)
-                print(f"[LOG] Loaded default palette from {found_path}")
+                logger.info("Loaded default palette from %s", found_path)
             else:
-                print("[LOG] Default 'palette.pal' not found, using fallback.")
+                logger.info("Default 'palette.pal' not found, using fallback.")
                 
         except Exception as e:
-            print(f"[ERROR] Failed to load default palette: {e}")
+            logger.error("Failed to load default palette: %s", e)
 
     def open_bulk_editor(self):
         # Sync UI to Mapper before opening
@@ -1225,7 +1228,7 @@ class MappingTab:
                 # Trigger icon update immediately
                 self.update_icons()
             except Exception as e:
-                print(f"Picker error: {e}")
+                logger.error("Picker error: %s", e)
             return
         
         # Priority 2: Assign to focused entry (fallback)
@@ -1236,4 +1239,4 @@ class MappingTab:
                  focused.insert(0, hex_id)
                  focused.event_generate("<FocusOut>")
              except Exception as e:
-                 print(f"Could not paste to focused widget: {e}")
+                 logger.error("Could not paste to focused widget: %s", e)

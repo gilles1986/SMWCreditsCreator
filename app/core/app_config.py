@@ -53,3 +53,8 @@ class AppConfig:
     def set(self, key, value):
         self.data[key] = value
         self.save() # Auto-save on set
+
+    def set_many(self, updates):
+        """Set multiple keys at once with a single disk write."""
+        self.data.update(updates)
+        self.save()

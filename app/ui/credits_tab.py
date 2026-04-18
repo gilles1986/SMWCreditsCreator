@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 import os
+import logging
 import pyperclip
 from app.core.credits_parser import CreditsParser
 from app.core.map16_handler import Map16Generator, Map16Handler
@@ -9,6 +10,8 @@ from app.ui.theme import Theme
 from app.core.app_config import AppConfig
 from app.core.validator import Validator
 from app.core.config_manager import ConfigManager
+
+logger = logging.getLogger(__name__)
 
 class CreditsTab:
     def __init__(self, master, mapper, on_mapping_change=None):
@@ -88,7 +91,7 @@ class CreditsTab:
             widget.destroy()
 
     def show_view_main(self):
-        print("DEBUG: Loading CreditsTab Layout Fix V2")
+        logger.debug("Loading CreditsTab Layout Fix V2")
         self.clear_view()
 
         # Layout: Top (Split Column), Bottom (Settings + Log)
@@ -258,6 +261,7 @@ class CreditsTab:
                      text_color=Theme.TEXT_DIM, font=("Arial", 10)).pack(side="left", padx=(5, 0))
         self.ent_start_page.insert(0, f"{start_page_def:02X}")
         self.ent_start_page.bind("<FocusOut>", lambda _: self.save_config())
+        self.ent_start_page.bind("<KeyRelease>", lambda _: self._validate_start_page())
 
         # Row 1 (left): Priority
         priority_def = self.config.get("priority", False)
@@ -328,21 +332,32 @@ class CreditsTab:
 
 
     def save_config(self):
-        self.config.set("optimize_columns", self.chk_optimize_var.get())
-        self.config.set("add_empty_line", self.chk_empty_var.get())
-        self.config.set("blank_tile_id", self.ent_blank.get())
-        self.config.set("tile_size", self.font_size_var.get()) # Save as tile_size
-        self.config.set("capitalize", self.chk_capitalize_var.get())
-        # Map16 Settings
         act_as_val = self.ent_act_as.get().strip().split()[0] if self.ent_act_as.get().strip() else "0025"
-        self.config.set("act_as", act_as_val)
-        self.config.set("priority", self.priority_var.get())
-        self.config.set("sort_mode", self.sort_mode_var.get())
+        updates = {
+            "optimize_columns": self.chk_optimize_var.get(),
+            "add_empty_line": self.chk_empty_var.get(),
+            "blank_tile_id": self.ent_blank.get(),
+            "tile_size": self.font_size_var.get(),
+            "capitalize": self.chk_capitalize_var.get(),
+            "act_as": act_as_val,
+            "priority": self.priority_var.get(),
+            "sort_mode": self.sort_mode_var.get(),
+        }
         try:
-            start_page = int(self.ent_start_page.get(), 16)
-            self.config.set("start_page", start_page)
+            updates["start_page"] = int(self.ent_start_page.get(), 16)
         except ValueError:
             pass  # Keep previous valid start_page
+        self.config.set_many(updates)
+
+    def _validate_start_page(self):
+        """Visual feedback for start page hex entry."""
+        val = self.ent_start_page.get().strip()
+        try:
+            if val:
+                int(val, 16)
+            self.ent_start_page.configure(border_color=Theme.TEXT_SUCCESS)
+        except ValueError:
+            self.ent_start_page.configure(border_color="#FF4444")
 
     def browse_file(self):
         file = filedialog.askopenfilename(filetypes=[("Credits File", "*.json *.txt")])
@@ -379,7 +394,7 @@ class CreditsTab:
             self.txt_log.see("end")
             self.txt_log.configure(state="disabled")
         else:
-            print(f"[LOG] {message}")
+            logger.info(message)
 
     def _generate_tiles_internal(self):
         """Helper to generate tiles based on current settings."""
@@ -469,8 +484,7 @@ class CreditsTab:
             
         except Exception as e:
             self.log(f"Error generating tiles: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("Error generating tiles")
             messagebox.showerror("Generation Error", str(e))
             return None, None
 

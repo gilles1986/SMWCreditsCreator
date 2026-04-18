@@ -1,4 +1,5 @@
 import ctypes
+import logging
 from ctypes import wintypes
 
 user32 = ctypes.windll.user32
@@ -6,6 +7,8 @@ kernel32 = ctypes.windll.kernel32
 
 GMEM_MOVEABLE = 0x0002
 GMEM_ZEROINIT = 0x0040
+
+logger = logging.getLogger(__name__)
 
 class ClipboardHandler:
     @staticmethod
@@ -27,7 +30,7 @@ class ClipboardHandler:
         u_format = user32.RegisterClipboardFormatW(fmt_name)
         
         if u_format == 0:
-            print("Failed to register clipboard format")
+            logger.error("Failed to register clipboard format")
             return False
 
         if not user32.OpenClipboard(None):
@@ -40,12 +43,12 @@ class ClipboardHandler:
             size = len(binary_data)
             hMem = kernel32.GlobalAlloc(GMEM_MOVEABLE, size)
             if hMem:
-                print(f"[DEBUG] hMem: {hMem}")
+                logger.debug("hMem: %s", hMem)
                 pMem = kernel32.GlobalLock(hMem)
-                print(f"[DEBUG] pMem: {pMem}")
+                logger.debug("pMem: %s", pMem)
                 
                 if not pMem:
-                    print("[DEBUG] GlobalLock failed.")
+                    logger.debug("GlobalLock failed.")
                     
                 # Robustly convert to C-buffer
                 src_buffer = (ctypes.c_char * size).from_buffer_copy(binary_data)
