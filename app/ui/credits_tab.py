@@ -29,7 +29,7 @@ class CreditsTab:
         
         # Central View Container
         self.view_container = ctk.CTkFrame(self.master, fg_color="transparent")
-        self.view_container.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
+        self.view_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         self.view_container.grid_columnconfigure(0, weight=1)
         
         self.show_view_main()
@@ -98,7 +98,7 @@ class CreditsTab:
         
         # Container for Top Sections (Content + Visuals)
         top_container = ctk.CTkFrame(self.view_container, fg_color="transparent")
-        top_container.pack(fill="x", pady=(0, 10))
+        top_container.pack(fill="x", pady=(0, 5))
         top_container.grid_columnconfigure(0, weight=1)
         top_container.grid_columnconfigure(1, weight=1)
         
@@ -283,41 +283,26 @@ class CreditsTab:
                      text_color=Theme.TEXT_DIM, font=("Arial", 10)).grid(row=3, column=0, columnspan=4, sticky="w", padx=20, pady=(0, 5))
 
         # 3. Actions & Log
-        action_frame = ctk.CTkFrame(self.view_container)
-        action_frame.pack(fill="both", expand=True, pady=10)
-        
-        # Grid for Actions
-        act_grid = ctk.CTkFrame(action_frame, fg_color="transparent")
-        act_grid.pack(fill="x", padx=20, pady=10)
-        
-        # self.btn_generate_proj = ctk.CTkButton(act_grid, text="Export as Text File (.txt)", 
-        #                                   command=self.generate_text_file, 
-        #                                   height=40, font=('Arial', 13, 'bold'),
-        #                                   fg_color=Theme.BTN_PRIMARY)
-        # self.btn_generate_proj.pack(side="left", fill="x", expand=True, padx=(0, 10))
-        
-        self.btn_save_bin = ctk.CTkButton(act_grid, text="Save .map16", 
+        # Save button - directly below settings, no expanding wrapper
+        self.btn_save_bin = ctk.CTkButton(self.view_container, text="Save .map16", 
                                           command=self.save_as_file, 
                                           height=40, font=('Arial', 13, 'bold'),
                                           fg_color=Theme.BTN_SUCCESS)
-        self.btn_save_bin.pack(side="left", fill="x", expand=True, padx=5)
+        self.btn_save_bin.pack(fill="x", pady=(5, 5))
 
-        # self.btn_clipboard = ctk.CTkButton(act_grid, text="Copy to Clipboard", 
-        #                                   command=self.copy_to_clipboard, 
-        #                                   height=40, font=('Arial', 13, 'bold'), # Standard color
-        #                                   )
-        # self.btn_clipboard.pack(side="left", fill="x", expand=True, padx=(10, 0))
+        # Log Pane - takes all remaining space
+        log_frame = ctk.CTkFrame(self.view_container)
+        log_frame.pack(fill="both", expand=True)
         
-        # Log Pane
-        ctk.CTkLabel(action_frame, text="Output Log:", text_color=Theme.TEXT_DIM, font=("Arial", 11)).pack(anchor="w", padx=20, pady=(0, 5))
+        ctk.CTkLabel(log_frame, text="Output Log:", text_color=Theme.TEXT_DIM, font=("Arial", 11)).pack(anchor="w", padx=15, pady=(5, 3))
         
-        self.txt_log = ctk.CTkTextbox(action_frame, 
+        self.txt_log = ctk.CTkTextbox(log_frame, 
                                       text_color=Theme.TEXT_NORMAL, 
                                       fg_color=Theme.BG_COLOR_2,
                                       corner_radius=6,
                                       padx=10, pady=10,
                                       font=("Consolas", 12))
-        self.txt_log.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        self.txt_log.pack(fill="both", expand=True, padx=15, pady=(0, 10))
         self.txt_log.insert("0.0", "\n".join(self.log_history))
         self.txt_log.configure(state="disabled") # Read-only but selectable
 
