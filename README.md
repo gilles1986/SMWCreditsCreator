@@ -7,6 +7,7 @@ A Python desktop application for managing Tile-to-Character Mappings for Super M
 - **Project Validation**: Automatically checks if the selected folder is a valid RHR project.
 - **Config Fix**: Detects and fixes missing settings in `exports.toml` (specifically `use_text_map16_format`).
 - **Mapping Editor**: Easily assign Hex IDs to characters with a visual interface. Save and load mappings as JSON.
+- **Input Validation**: Real-time hex validation on all tile ID fields with visual feedback (green/red borders). Invalid values are caught at entry, load, bulk edit, and export time.
 - **Map16 Generation**: Generates `.map16` files compatible with Lunar Magic's 16x16 Tile Map Editor.
 - **Custom Font Support**: Supports 8x8, 8x16, and 16x16 tile sizes.
 - **Integration**: Import credits directly from Saphros SMW Credits Manager files (.json).
@@ -75,3 +76,12 @@ To ensure everything works correctly (especially after changes), run the tests:
 ```bash
 python -m unittest discover tests
 ```
+
+## Changelog
+
+### v1.2.0
+- **Input Validation**: Added comprehensive hex tile ID validation across all layers (UI fields, JSON load/save, bulk editor, export). Invalid values like blank entries or non-hex strings are now caught with visual feedback (red/green borders) instead of silently producing garbled output.
+- **Bug Fixes**: Fixed dead code paths in mapper, orphaned parse block in map16_handler, clipboard false-positive return, and 6 broken tests.
+- **Code Quality**: Replaced all bare `except:` blocks with specific exception types across 10 files. Replaced all `print()` debug statements with proper `logging` calls.
+- **Performance**: Config saves are now batched (1 disk write instead of 8 per save).
+- **Refactoring**: Broke apart 240-line tile packing method into focused helper methods, eliminating duplicate code.

@@ -5,7 +5,7 @@ import os
 import sys
 import logging
 
-VERSION = "1.0.0"
+VERSION = "1.2.0"
 
 logger = logging.getLogger(__name__)
 
