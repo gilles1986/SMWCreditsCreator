@@ -443,7 +443,12 @@ class CreditsTab:
                      messagebox.showerror("Error", "Please select a credits file.")
                      return None, None
                 self.log(f"Parsing file: {os.path.basename(self.credits_path)}")
-                credits_data = CreditsParser.parse_file(self.credits_path)
+                try:
+                    credits_data = CreditsParser.parse_file(self.credits_path)
+                except ValueError as e:
+                    self.log(f"Error: {e}")
+                    messagebox.showerror("Parse Error", str(e))
+                    return None, None
             else:
                 # Text Input
                 content = self.txt_credits_input.get("1.0", "end").strip()
@@ -454,11 +459,21 @@ class CreditsTab:
                 
                 # Check if JSON
                 is_json = content.strip().startswith(("[", "{"))
-                credits_data = CreditsParser.parse_content(content, is_json=is_json)
+                try:
+                    credits_data = CreditsParser.parse_content(content, is_json=is_json)
+                except ValueError as e:
+                    self.log(f"Error: {e}")
+                    messagebox.showerror("Parse Error", str(e))
+                    return None, None
                 self.log("Parsed text content.")
 
             if not credits_data:
-                 self.log("Error: Failed to parse credits content.")
+                 self.log("Error: No credits data found. The file may be empty or in an unrecognized format.")
+                 messagebox.showerror("Parse Error",
+                     "No credits data found.\n\n"
+                     "Expected JSON format:\n"
+                     '[{"section": "...", "authors": [{"name": "..."}]}]\n\n'
+                     "Or plain text with one name per line.")
                  return None, None
 
             # Apply Capitalization (Uppercase all content)

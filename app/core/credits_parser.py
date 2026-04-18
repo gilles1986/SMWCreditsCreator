@@ -32,8 +32,10 @@ class CreditsParser:
         """Parses raw content string."""
         if is_json:
             if isinstance(content, str):
-                try: content = json.loads(content)
-                except (json.JSONDecodeError, ValueError): return {}
+                try:
+                    content = json.loads(content)
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"Invalid JSON syntax: {e}")
             return CreditsParser._parse_json_content(content)
         else:
             return CreditsParser._parse_txt_content(content)
@@ -52,9 +54,10 @@ class CreditsParser:
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 return CreditsParser._parse_txt_content(f.read())
+        except FileNotFoundError:
+            raise ValueError(f"File not found: {filepath}")
         except Exception as e:
-            logger.error(f"Error parsing text credits: {e}")
-            return {}
+            raise ValueError(f"Error reading text file: {e}")
 
     @staticmethod
     def _parse_json(filepath):
@@ -62,40 +65,55 @@ class CreditsParser:
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = json.load(f)
             return CreditsParser._parse_json_content(content)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON syntax: {e}")
+        except FileNotFoundError:
+            raise ValueError(f"File not found: {filepath}")
         except Exception as e:
-            logger.error(f"Error parsing JSON credits file: {e}")
-            return {}
+            raise ValueError(f"Error reading JSON file: {e}")
 
     @staticmethod
     def _parse_json_content(content):
         data = {}
-        try:
-            # Content is list of objects
-            if not isinstance(content, list):
-                logger.error("JSON credits root must be a list")
-                return {}
+        # Content is list of objects
+        if not isinstance(content, list):
+            raise ValueError(
+                f"JSON root must be a list (got {type(content).__name__}). "
+                "Expected format: [{\"section\": \"...\", \"authors\": [...]}]"
+            )
 
-            for item in content:
-                raw_section = item.get("section", "unknown")
-                section_name = CreditsParser.SECTION_MAP.get(raw_section, raw_section.capitalize())
-                
-                if section_name not in data:
-                    data[section_name] = set()
+        for i, item in enumerate(content):
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"Item {i} must be an object/dict (got {type(item).__name__}). "
+                    "Expected: {\"section\": \"...\", \"authors\": [...]}"
+                )
+            raw_section = item.get("section", "unknown")
+            section_name = CreditsParser.SECTION_MAP.get(raw_section, raw_section.capitalize())
 
-                item_authors = item.get("authors", [])
-                for auth in item_authors:
+            if section_name not in data:
+                data[section_name] = set()
+
+            item_authors = item.get("authors", [])
+            if not isinstance(item_authors, list):
+                raise ValueError(
+                    f"'authors' in section '{raw_section}' must be a list (got {type(item_authors).__name__})"
+                )
+            for auth in item_authors:
+                if isinstance(auth, dict):
                     name = auth.get("name")
-                    if name:
-                        data[section_name].add(name)
-            
-            # Convert sets to sorted lists
-            final_data = {}
-            for sec, names in data.items():
-                if names:
-                    final_data[sec] = sorted(list(names), key=str.lower)
-            
-            return final_data
-        except Exception as e:
-             logger.error(f"Error parsing JSON content: {e}")
-             return {}
+                elif isinstance(auth, str):
+                    name = auth
+                else:
+                    continue
+                if name:
+                    data[section_name].add(name)
+
+        # Convert sets to sorted lists
+        final_data = {}
+        for sec, names in data.items():
+            if names:
+                final_data[sec] = sorted(list(names), key=str.lower)
+
+        return final_data
 
