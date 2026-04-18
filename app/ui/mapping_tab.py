@@ -26,16 +26,16 @@ class MappingTab:
         self.start_page = self.config.get("start_page", 0x60)
         self.tile_size = self.config.get("tile_size", "8x8")
         
-        # Grid layout (2 Columns) - Increased Col 1 Width (approx 300px)
-        self.master.grid_columnconfigure(0, weight=0, minsize=320) # Col 1: Character Map
+        # Grid layout (2 Columns)
+        self.master.grid_columnconfigure(0, weight=0, minsize=280) # Col 1: Character Map
         self.master.grid_columnconfigure(1, weight=1) # Col 2: Settings + Graphics
-        self.master.grid_columnconfigure(2, weight=0) # Remove Col 3
+        self.master.grid_columnconfigure(2, weight=0)
         self.master.grid_rowconfigure(0, weight=1)
         
         
         # --- Column 1: Character Map ---
         char_map_container = ctk.CTkFrame(self.master, fg_color="transparent")
-        char_map_container.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        char_map_container.grid(row=0, column=0, padx=(10, 5), pady=10, sticky="nsew")
         
         # Header with info icon and converter button
         header_frame = ctk.CTkFrame(char_map_container, fg_color="transparent")
@@ -57,7 +57,7 @@ class MappingTab:
                                           command=self.convert_mappings)
         self.btn_converter.pack(side="right", padx=5)
         
-        self.scroll_frame = ctk.CTkScrollableFrame(char_map_container, width=290)
+        self.scroll_frame = ctk.CTkScrollableFrame(char_map_container, width=250)
         self.scroll_frame.pack(fill="both", expand=True)
 
         # --- Column 2: Configuration & Graphics (Compact) ---
@@ -73,28 +73,22 @@ class MappingTab:
         self.config_frame.grid_columnconfigure(1, weight=1)
         
         self.lbl_config_title = ctk.CTkLabel(self.config_frame, text="Configuration", font=Theme.FONT_BOLD)
-        self.lbl_config_title.grid(row=0, column=0, columnspan=2, pady=(5, 5))
+        self.lbl_config_title.grid(row=0, column=0, columnspan=2, pady=(5, 3))
 
         def create_compact_frame(row, col):
             f = ctk.CTkFrame(self.config_frame, fg_color="transparent")
             f.grid(row=row, column=col, padx=4, pady=2, sticky="ew")
             return f
 
-        def add_label(frame, label, help_text):
-            l = ctk.CTkLabel(frame, text=label, anchor="w", font=("Arial", 12, "bold"))
-            l.pack(fill="x")
-            if help_text:
-                ctk.CTkLabel(frame, text=help_text, text_color=Theme.TEXT_DIM, font=("Arial", 10), anchor="w").pack(fill="x")
-
-        # Row 1: Tile Size | Palette
+        # Row 1: Tile Size | Palette (compact, no sub-labels)
         f1 = create_compact_frame(1, 0)
-        add_label(f1, "Tile Size", "Size of char tile")
+        ctk.CTkLabel(f1, text="Tile Size", anchor="w", font=("Arial", 11, "bold")).pack(fill="x")
         self.tile_size_var = ctk.StringVar(value=self.tile_size)
         self.opt_size = ctk.CTkOptionMenu(f1, variable=self.tile_size_var, values=["8x8", "8x16", "16x16"], command=self.on_tile_size_change, height=24)
         self.opt_size.pack(fill="x")
         
         f2 = create_compact_frame(1, 1)
-        add_label(f2, "Palette", "Color palette index")
+        ctk.CTkLabel(f2, text="Palette", anchor="w", font=("Arial", 11, "bold")).pack(fill="x")
         self.pal_var = ctk.IntVar(value=self.palette)
         self.opt_pal = ctk.CTkOptionMenu(f2, variable=self.pal_var, values=[str(i) for i in range(8)], command=self.save_settings_pal, height=24)
         self.opt_pal.pack(fill="x")
@@ -105,7 +99,7 @@ class MappingTab:
 
         # Row 3: Action Buttons
         action_frame = ctk.CTkFrame(self.config_frame, fg_color="transparent")
-        action_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=10)
+        action_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(5, 8))
         
         ctk.CTkButton(action_frame, text="Load Mapping", width=80, command=self.load_mapping).pack(side="left", padx=5, expand=True, fill="x")
         ctk.CTkButton(action_frame, text="Save Mapping", width=80, command=self.save_mapping).pack(side="left", padx=5, expand=True, fill="x")
@@ -136,8 +130,7 @@ class MappingTab:
 
         # Static Canvas area (Fixed size 128x64 * 3)
         self.gfx_frame = ctk.CTkFrame(self.gfx_frame_container, fg_color="transparent")
-        # Increased pady from 5 to (15, 5) for top spacing
-        self.gfx_frame.pack(fill="none", expand=False, padx=5, pady=(15, 5), anchor="nw")
+        self.gfx_frame.pack(fill="none", expand=False, padx=5, pady=(8, 5), anchor="nw")
         
         # Dimensions: 128x64 * 3 = 384x192
         self.width_in_tiles = 16
@@ -352,35 +345,33 @@ class MappingTab:
         chars = sorted(keys) 
         for i, char in enumerate(chars):
             # Styling constants
-            ROW_PADY = 8
-            LABEL_FONT = ("Arial", 20, "bold")
-            ENTRY_FONT = ("Arial", 14, "bold")
+            ROW_PADY = 3
+            LABEL_FONT = ("Arial", 16, "bold")
+            ENTRY_FONT = ("Arial", 13, "bold")
             
             # Column 0: Label
             lbl_text = f"'{char}'" if char != ' ' else "'Space'"
             lbl = ctk.CTkLabel(self.scroll_frame, text=lbl_text, width=50, font=LABEL_FONT)
-            lbl.grid(row=i, column=0, padx=(10, 5), pady=ROW_PADY, sticky="e")
+            lbl.grid(row=i, column=0, padx=(10, 3), pady=ROW_PADY, sticky="e")
             
             # Column 1: Entry
             entry = ctk.CTkEntry(self.scroll_frame, placeholder_text="Hex", width=80, 
-                                 font=ENTRY_FONT, justify="center")
-            entry.grid(row=i, column=1, padx=5, pady=ROW_PADY, sticky="w")
+                                 font=ENTRY_FONT, justify="center", height=28)
+            entry.grid(row=i, column=1, padx=3, pady=ROW_PADY, sticky="w")
             
             # Column 2: Picker Button (skip for Space)
             if char != ' ':
-                picker_btn = ctk.CTkButton(self.scroll_frame, text="🎯", width=32, height=32,
-                                           font=("Arial", 16),
+                picker_btn = ctk.CTkButton(self.scroll_frame, text="🎯", width=28, height=28,
+                                           font=("Arial", 14),
                                            fg_color=Theme.BTN_PRIMARY,
                                            hover_color=Theme.BTN_PRIMARY,
                                            command=lambda e=entry: self.activate_picker(e))
-                picker_btn.grid(row=i, column=2, padx=5, pady=ROW_PADY)
+                picker_btn.grid(row=i, column=2, padx=3, pady=ROW_PADY)
             
             # Column 3: Icon (Visual Feedback)
-            # Skip icon for Space
             if char != ' ':
-                # 64x64 to allow space for 16x16 tiles at 4x zoom
-                icon = ctk.CTkLabel(self.scroll_frame, text="", width=64, height=64) 
-                icon.grid(row=i, column=3, padx=10, pady=ROW_PADY, sticky="w")
+                icon = ctk.CTkLabel(self.scroll_frame, text="", width=48, height=48) 
+                icon.grid(row=i, column=3, padx=5, pady=ROW_PADY, sticky="w")
                 self.icon_labels[char] = icon
 
             val = self.mapper.get_mapping(char)
