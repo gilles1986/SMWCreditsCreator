@@ -642,246 +642,185 @@ class Map16Generator:
     def _create_empty_row(self):
          return self._pack_char_ids_into_map16_row([])
 
+    @staticmethod
+    def _parse_ids(id_str):
+        """Parse comma-separated ID string into list of stripped parts."""
+        if not id_str:
+            return []
+        try:
+            parts = id_str.split(',')
+            return [p.strip() for p in parts if p.strip()]
+        except (AttributeError, TypeError):
+            return [id_str]
+
+    @staticmethod
+    def _get_id_and_flags(val):
+        """Parse a tile value into (hex_str_id, flip_x, flip_y, priority)."""
+        try:
+            if isinstance(val, int):
+                return f"{val:03X}", False, False, False
+
+            flags_str = ""
+            base_id = val
+
+            if isinstance(val, str) and ':' in val:
+                parts = val.split(':')
+                base_id = parts[0]
+                if len(parts) > 1:
+                    flags_str = parts[1]
+
+            try:
+                int_id = int(base_id, 16)
+                hex_id = f"{int_id:03X}"
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid tile_id '{base_id}' in get_id_and_flags(), using 000")
+                hex_id = "000"
+
+            fx = 'x' in flags_str
+            fy = 'y' in flags_str
+            fp = 'p' in flags_str
+
+            return hex_id, fx, fy, fp
+        except Exception as e:
+            logger.warning(f"Unexpected error in get_id_and_flags('{val}'): {e}")
+            return "000", False, False, False
+
+    @staticmethod
+    def _offset_val(base_val, offset):
+        """Compute new tile value by adding offset to base hex ID, preserving flags."""
+        tid, fx, fy, fp = Map16Generator._get_id_and_flags(base_val)
+        try:
+            nid = int(tid, 16) + offset
+            flags = ""
+            if fx: flags += "x"
+            if fy: flags += "y"
+            if fp: flags += "p"
+            return f"{nid:03X}:{flags}"
+        except ValueError:
+            return base_val
+
+    def _apply_to_subtile(self, st, val):
+        """Apply tile ID and flags from val to a sub-tile, merging global priority/palette."""
+        tid, fx, fy, fp = self._get_id_and_flags(val)
+        st.tile_id = tid
+        st.flip_x = fx
+        st.flip_y = fy
+        st.priority = self.priority or fp
+        st.palette = self.palette
+
+    def _is_blank_tile(self, val):
+        """Check if a tile value matches the blank tile ID."""
+        tid, _, _, _ = self._get_id_and_flags(val)
+        try:
+            return int(tid, 16) == int(self.blank_tile_id, 16)
+        except ValueError:
+            return False
+
     def _pack_char_ids_into_map16_row(self, char_ids):
-        """
-        Packs characters into 16 Map16Tiles based on font_size.
-        """
-        map16_tiles = []
-        
-        # Helper to parse ID string -> list of ints/strings
-        def parse_ids(id_str):
-             if not id_str: return []
-             try:
-                 parts = id_str.split(',')
-                 return [p.strip() for p in parts if p.strip()]
-             except (AttributeError, TypeError):
-                 return [id_str]
-
-        # Helper to get sub-tile parsed info
-        # Returns (hex_str_id, flip_x, flip_y, priority)
-        def get_id_and_flags(val):
-             try:
-                 if isinstance(val, int):
-                      return f"{val:03X}", False, False, False
-                 
-                 flags_str = ""
-                 base_id = val
-                 
-                 if isinstance(val, str) and ':' in val:
-                      parts = val.split(':')
-                      base_id = parts[0]
-                      if len(parts) > 1:
-                           flags_str = parts[1]
-                 
-                 try:
-                      int_id = int(base_id, 16)
-                      hex_id = f"{int_id:03X}"
-                 except (ValueError, TypeError):
-                      logger.warning(f"Invalid tile_id '{base_id}' in get_id_and_flags(), using 000")
-                      hex_id = "000"
-                 
-                 fx = 'x' in flags_str
-                 fy = 'y' in flags_str
-                 fp = 'p' in flags_str
-                 
-                 return hex_id, fx, fy, fp
-             except Exception as e:
-                 logger.warning(f"Unexpected error in get_id_and_flags('{val}'): {e}")
-                 return "000", False, False, False
-        
-        # Helper method to apply properties to a specific sub-tile
-        def apply_to_subtile(st, val):
-             tid, fx, fy, fp = get_id_and_flags(val)
-             st.tile_id = tid
-             st.flip_x = fx
-             st.flip_y = fy
-             # Priority: OR with global setting? Or override?
-             # Usually "Global Priority" implies all credits on top.
-             # If specific tile has priority, it should definitely be set.
-             st.priority = self.priority or fp
-             st.palette = self.palette
-
+        """Packs characters into 16 Map16Tiles based on font_size."""
         if self.font_size == "16x16":
-             # 1 Char = 1 Map16 Tile
-             row_chars = char_ids[:16]
-             row_chars += [self.blank_tile_id] * (16 - len(row_chars))
-             
-             for cid in row_chars:
-                  parts = parse_ids(cid)
-                  
-                  t_tl = parts[0] if parts else self.blank_tile_id
-                  
-                  # Determine Sub-tile IDs and Flags
-                  val_tl = t_tl
-                  val_tr, val_bl, val_br = None, None, None
-                  
-                  # Helper to check if a tile ID is blank
-                  def is_blank(v):
-                       tid, _, _, _ = get_id_and_flags(v)
-                       try: return int(tid, 16) == int(self.blank_tile_id, 16)
-                       except ValueError: return False
-                  
-                  # If the primary tile is blank, all sub-tiles should be blank
-                  if is_blank(val_tl):
-                       val_tr = self.blank_tile_id
-                       val_bl = self.blank_tile_id
-                       val_br = self.blank_tile_id
-                  elif len(parts) >= 4:
-                       val_tr = parts[1]
-                       val_bl = parts[2]
-                       val_br = parts[3]
-                  elif len(parts) == 2:
-                       # Smart 2-Row Logic is complex with flags.
-                       # If standard int logic applies, we calculate. 
-                       # If explicit flags provided, we use as base?
-                       # Assuming if using shorthand with flags, logic applies to base ID, flags separate?
-                       # OR: if flags are used, shorthand might not be safe.
-                       # But let's try to support: "280:x, 285" -> 
-                       # TL=280:x, TR=281:x, BL=285, BR=286
-                       
-                       # Helper to increment hex string with carried flags? 
-                       # Currently, let's assume if 2 parts:
-                       # TL = P0, BL = P1. TR and BR are calculated (+1).
-                       # Inherit flags? Usually mirroring applies to the whole block relative to axis?
-                       # If I mirror 16x16 X-wise:
-                       # Real 16x16 geometry:
-                       # [TL] [TR]  --> [TR_flipped] [TL_flipped]
-                       # This is too complex for simple tile mapping shorthand.
-                       # Let's assume Flags apply strictly to the 8x8 tile itself as defined.
-                       # So: TR = TL base + 1. Flags? Keep same flags as TL? 
-                       # Usually if flipping a character, you flip all 8x8s.
-                       
-                       def offset_val(base_val, offset):
-                            tid, fx, fy, fp = get_id_and_flags(base_val)
-                            try:
-                                 nid = int(tid, 16) + offset
-                                 flags = ""
-                                 if fx: flags += "x"
-                                 if fy: flags += "y"
-                                 if fp: flags += "p"
-                                 return f"{nid:03X}:{flags}"
-                            except ValueError:
-                                 return base_val
-                                 
-                       val_tr = offset_val(val_tl, 1)
-                       val_bl = parts[1]
-                       val_br = offset_val(val_bl, 1)
-                       
-                  else:
-                       # Fallback 16x16 standard
-                       def offset_val(base_val, offset):
-                            tid, fx, fy, fp = get_id_and_flags(base_val)
-                            try:
-                                 nid = int(tid, 16) + offset
-                                 flags = ""
-                                 if fx: flags += "x"
-                                 if fy: flags += "y"
-                                 if fp: flags += "p"
-                                 return f"{nid:03X}:{flags}"
-                            except ValueError:
-                                 return base_val
-
-                       val_tr = offset_val(val_tl, 1)
-                       val_bl = offset_val(val_tl, 16)
-                       val_br = offset_val(val_tl, 17)
-                  
-                  tile = Map16Tile(f"0000", self.act_as)
-                  
-                  apply_to_subtile(tile.sub_tiles[0], val_tl)
-                  apply_to_subtile(tile.sub_tiles[1], val_tr)
-                  apply_to_subtile(tile.sub_tiles[2], val_bl)
-                  apply_to_subtile(tile.sub_tiles[3], val_br)
-                  
-                  map16_tiles.append(tile)
-
+            return self._pack_16x16_tiles(char_ids)
         elif self.font_size == "8x16":
-             # 2 Chars per Map16 Tile
-             padded = char_ids + [self.blank_tile_id] * (32 - len(char_ids))
-             
-             for i in range(0, 32, 2):
-                  c1 = padded[i]
-                  c2 = padded[i+1]
-                  
-                  p1 = parse_ids(c1)
-                  p2 = parse_ids(c2)
-                  
-                  # Char 1 (Left Half)
-                  val_tl = p1[0] if p1 else self.blank_tile_id
-                  
-                  def is_blank(v):
-                       tid, _, _, _ = get_id_and_flags(v)
-                       try: return int(tid, 16) == int(self.blank_tile_id, 16)
-                       except ValueError: return False # Default
-                       
-                  if is_blank(val_tl):
-                       val_bl = self.blank_tile_id
-                  else:
-                       if len(p1) >= 2:
-                            val_bl = p1[1]
-                       else:
-                            # Offset +0x10
-                             tid, fx, fy, fp = get_id_and_flags(val_tl)
-                             try:
-                                 nid = int(tid, 16) + 16
-                                 flags = ""
-                                 if fx: flags += "x"
-                                 if fy: flags += "y"
-                                 if fp: flags += "p"
-                                 val_bl = f"{nid:03X}:{flags}"
-                             except ValueError:
-                                  val_bl = val_tl 
+            return self._pack_8x16_tiles(char_ids)
+        else:
+            return self._pack_8x8_tiles(char_ids)
 
-                  # Char 2 (Right Half)
-                  val_tr = p2[0] if p2 else self.blank_tile_id
-                  
-                  if is_blank(val_tr):
-                       val_br = self.blank_tile_id
-                  else:
-                       if len(p2) >= 2:
-                            val_br = p2[1]
-                       else:
-                             tid, fx, fy, fp = get_id_and_flags(val_tr)
-                             try:
-                                 nid = int(tid, 16) + 16
-                                 flags = ""
-                                 if fx: flags += "x"
-                                 if fy: flags += "y"
-                                 if fp: flags += "p"
-                                 val_br = f"{nid:03X}:{flags}"
-                             except ValueError:
-                                  val_br = val_tr 
-                  
-                  tile = Map16Tile(f"0000", self.act_as)
-                  apply_to_subtile(tile.sub_tiles[0], val_tl)
-                  apply_to_subtile(tile.sub_tiles[1], val_tr)
-                  apply_to_subtile(tile.sub_tiles[2], val_bl)
-                  apply_to_subtile(tile.sub_tiles[3], val_br)
-                  
-                  map16_tiles.append(tile)
+    def _pack_16x16_tiles(self, char_ids):
+        """Pack character IDs as 16x16 tiles (1 char = 1 Map16 tile)."""
+        map16_tiles = []
+        row_chars = char_ids[:16]
+        row_chars += [self.blank_tile_id] * (16 - len(row_chars))
 
-        else: # 8x8 (Default)
-             padded = char_ids + [self.blank_tile_id] * (32 - len(char_ids))
-             
-             for i in range(0, 32, 2):
-                  c1 = padded[i]
-                  c2 = padded[i+1]
-                  
-                  p1 = parse_ids(c1)
-                  p2 = parse_ids(c2)
-                  
-                  val_tl = p1[0] if p1 else self.blank_tile_id
-                  val_bl = p1[1] if len(p1) > 1 else self.blank_tile_id
-                  
-                  val_tr = p2[0] if p2 else self.blank_tile_id
-                  val_br = p2[1] if len(p2) > 1 else self.blank_tile_id
-                  
-                  tile = Map16Tile(f"0000", self.act_as)
-                  apply_to_subtile(tile.sub_tiles[0], val_tl)
-                  apply_to_subtile(tile.sub_tiles[1], val_tr)
-                  apply_to_subtile(tile.sub_tiles[2], val_bl)
-                  apply_to_subtile(tile.sub_tiles[3], val_br)
-                  
-                  map16_tiles.append(tile)
+        for cid in row_chars:
+            parts = self._parse_ids(cid)
+            val_tl = parts[0] if parts else self.blank_tile_id
+            val_tr, val_bl, val_br = None, None, None
+
+            if self._is_blank_tile(val_tl):
+                val_tr = self.blank_tile_id
+                val_bl = self.blank_tile_id
+                val_br = self.blank_tile_id
+            elif len(parts) >= 4:
+                val_tr = parts[1]
+                val_bl = parts[2]
+                val_br = parts[3]
+            elif len(parts) == 2:
+                # 2-part shorthand: TL=P0, BL=P1, TR/BR computed (+1)
+                # Flags apply to individual 8x8 tiles as defined
+                val_tr = self._offset_val(val_tl, 1)
+                val_bl = parts[1]
+                val_br = self._offset_val(val_bl, 1)
+            else:
+                # Standard 16x16: TL+1=TR, TL+16=BL, TL+17=BR
+                val_tr = self._offset_val(val_tl, 1)
+                val_bl = self._offset_val(val_tl, 16)
+                val_br = self._offset_val(val_tl, 17)
+
+            tile = Map16Tile("0000", self.act_as)
+            self._apply_to_subtile(tile.sub_tiles[0], val_tl)
+            self._apply_to_subtile(tile.sub_tiles[1], val_tr)
+            self._apply_to_subtile(tile.sub_tiles[2], val_bl)
+            self._apply_to_subtile(tile.sub_tiles[3], val_br)
+            map16_tiles.append(tile)
+
+        return map16_tiles
+
+    def _pack_8x16_tiles(self, char_ids):
+        """Pack character IDs as 8x16 tiles (2 chars = 1 Map16 tile)."""
+        map16_tiles = []
+        padded = char_ids + [self.blank_tile_id] * (32 - len(char_ids))
+
+        for i in range(0, 32, 2):
+            p1 = self._parse_ids(padded[i])
+            p2 = self._parse_ids(padded[i + 1])
+
+            # Left half (char 1)
+            val_tl = p1[0] if p1 else self.blank_tile_id
+            if self._is_blank_tile(val_tl):
+                val_bl = self.blank_tile_id
+            elif len(p1) >= 2:
+                val_bl = p1[1]
+            else:
+                val_bl = self._offset_val(val_tl, 16)
+
+            # Right half (char 2)
+            val_tr = p2[0] if p2 else self.blank_tile_id
+            if self._is_blank_tile(val_tr):
+                val_br = self.blank_tile_id
+            elif len(p2) >= 2:
+                val_br = p2[1]
+            else:
+                val_br = self._offset_val(val_tr, 16)
+
+            tile = Map16Tile("0000", self.act_as)
+            self._apply_to_subtile(tile.sub_tiles[0], val_tl)
+            self._apply_to_subtile(tile.sub_tiles[1], val_tr)
+            self._apply_to_subtile(tile.sub_tiles[2], val_bl)
+            self._apply_to_subtile(tile.sub_tiles[3], val_br)
+            map16_tiles.append(tile)
+
+        return map16_tiles
+
+    def _pack_8x8_tiles(self, char_ids):
+        """Pack character IDs as 8x8 tiles (2 chars = 1 Map16 tile, no vertical linking)."""
+        map16_tiles = []
+        padded = char_ids + [self.blank_tile_id] * (32 - len(char_ids))
+
+        for i in range(0, 32, 2):
+            p1 = self._parse_ids(padded[i])
+            p2 = self._parse_ids(padded[i + 1])
+
+            val_tl = p1[0] if p1 else self.blank_tile_id
+            val_bl = p1[1] if len(p1) > 1 else self.blank_tile_id
+            val_tr = p2[0] if p2 else self.blank_tile_id
+            val_br = p2[1] if len(p2) > 1 else self.blank_tile_id
+
+            tile = Map16Tile("0000", self.act_as)
+            self._apply_to_subtile(tile.sub_tiles[0], val_tl)
+            self._apply_to_subtile(tile.sub_tiles[1], val_tr)
+            self._apply_to_subtile(tile.sub_tiles[2], val_bl)
+            self._apply_to_subtile(tile.sub_tiles[3], val_br)
+            map16_tiles.append(tile)
 
         return map16_tiles
 
