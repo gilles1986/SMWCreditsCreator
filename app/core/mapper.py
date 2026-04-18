@@ -87,7 +87,6 @@ class Mapper:
             
             self.save_mappings(filepath)
             return True, f"Created default mapping file at {filepath} with standard A-Z."
-            return True, f"Created default mapping file at {filepath} with standard A-Z."
         else:
             return self.load_mappings(filepath)
 
@@ -194,14 +193,7 @@ class Mapper:
                 end_char = key_part[2]
                 
                 # Iterate range
-                curr_tile = start_tile
-                # ord ranges works for ASCII.
-                s_code = ord(start_char)
-                e_code = ord(end_char)
-                
-                # Iterate range
                 curr_tile = 0 if is_comma else start_tile
-                # ord ranges works for ASCII.
                 s_code = ord(start_char)
                 e_code = ord(end_char)
                 

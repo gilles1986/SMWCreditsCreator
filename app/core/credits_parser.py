@@ -33,7 +33,7 @@ class CreditsParser:
         if is_json:
             if isinstance(content, str):
                 try: content = json.loads(content)
-                except: return {}
+                except (json.JSONDecodeError, ValueError): return {}
             return CreditsParser._parse_json_content(content)
         else:
             return CreditsParser._parse_txt_content(content)

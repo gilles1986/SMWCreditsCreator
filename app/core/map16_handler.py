@@ -39,18 +39,16 @@ class Map16Tile:
     def __init__(self, tile_number, act_as="0025", sub_tiles=None):
         self.tile_number = tile_number # hex str: "6000"
         self.act_as = act_as           # hex str: "0130"
-        # List of 4 Map16SubTile objects: TL, BL, TR, BR (User specified order)
+        # List of 4 Map16SubTile objects: TL, TR, BL, BR (Reading Order)
         self.sub_tiles = sub_tiles if sub_tiles else [Map16SubTile() for _ in range(4)]
         self.is_empty = False
 
     def to_line(self):
-        # Always output full format (no ~ shorthand)
-        # Format: 6000: 0025 { TL BL TR BR }
-        # Act As: 4 digits, 8x8 tiles: 3 digits
+        if self.is_empty:
+            return f"{self.tile_number}: ~\n"
         
         act_as_str = self.act_as
         try:
-            # Parse and re-format to ensure 4 digits (matching error example)
             val = int(self.act_as, 16)
             act_as_str = f"{val:04X}"
         except (ValueError, TypeError):
@@ -430,34 +428,17 @@ class Map16Handler:
             if match:
                 try:
                     page_num = int(match.group(1), 16)
-                except:
+                except ValueError:
                     pass
         
-        header_size = 176
-        tile_data = data[header_size:]
-        
-        tiles = []
-        tile_count = len(tile_data) // 10
-        
-        for i in range(min(tile_count, 256)):  # Max 256 tiles per page
-            offset = i * 10
-            if offset + 10 > len(tile_data):
-                break
-            
-            tile_bytes = tile_data[offset:offset+10]
-            words = struct.unpack("<5H", tile_bytes)
-            
-            # Unpack subtiles (Column-Major: TL, BL, TR, BR)
-            def unpack_subtile(word):
-                tile_id = word & 0x3FF
-                palette = (word >> 10) & 0x7
-                priority = bool((word >> 13) & 1)
-                flip_x = bool((word >>14) & 1)
-                flip_y = bool((word >> 15) & 1)
-                return Map16SubTile(f"{tile_id:03X}", palette, flip_x, flip_y, priority)
-            
-            # Parse in column-major order, but store in reading order (TL, TR, BL, BR)
-            # words[0] = TL, words[1] = BL, words[2] = TR, words[3] = BR
+        def unpack_subtile(word):
+            tile_id = word & 0x3FF
+            palette = (word >> 10) & 0x7
+            priority = bool((word >> 13) & 1)
+            flip_x = bool((word >> 14) & 1)
+            flip_y = bool((word >> 15) & 1)
+            return Map16SubTile(f"{tile_id:03X}", palette, flip_x, flip_y, priority)
+
         # Detect format based on size
         # Full Page Export (Lunar Magic): 2736 bytes = 176 Header + 2048 Tile Data + 512 Act As Data
         is_full_page_export = (len(data) == 2736)
@@ -673,7 +654,7 @@ class Map16Generator:
              try:
                  parts = id_str.split(',')
                  return [p.strip() for p in parts if p.strip()]
-             except:
+             except (AttributeError, TypeError):
                  return [id_str]
 
         # Helper to get sub-tile parsed info
@@ -738,7 +719,7 @@ class Map16Generator:
                   def is_blank(v):
                        tid, _, _, _ = get_id_and_flags(v)
                        try: return int(tid, 16) == int(self.blank_tile_id, 16)
-                       except: return False
+                       except ValueError: return False
                   
                   # If the primary tile is blank, all sub-tiles should be blank
                   if is_blank(val_tl):
@@ -779,7 +760,7 @@ class Map16Generator:
                                  if fy: flags += "y"
                                  if fp: flags += "p"
                                  return f"{nid:03X}:{flags}"
-                            except:
+                            except ValueError:
                                  return base_val
                                  
                        val_tr = offset_val(val_tl, 1)
@@ -797,7 +778,7 @@ class Map16Generator:
                                  if fy: flags += "y"
                                  if fp: flags += "p"
                                  return f"{nid:03X}:{flags}"
-                            except:
+                            except ValueError:
                                  return base_val
 
                        val_tr = offset_val(val_tl, 1)
@@ -830,7 +811,7 @@ class Map16Generator:
                   def is_blank(v):
                        tid, _, _, _ = get_id_and_flags(v)
                        try: return int(tid, 16) == int(self.blank_tile_id, 16)
-                       except: return False # Default
+                       except ValueError: return False # Default
                        
                   if is_blank(val_tl):
                        val_bl = self.blank_tile_id
@@ -847,8 +828,8 @@ class Map16Generator:
                                  if fy: flags += "y"
                                  if fp: flags += "p"
                                  val_bl = f"{nid:03X}:{flags}"
-                             except:
-                                 val_bl = val_tl 
+                             except ValueError:
+                                  val_bl = val_tl 
 
                   # Char 2 (Right Half)
                   val_tr = p2[0] if p2 else self.blank_tile_id
@@ -867,8 +848,8 @@ class Map16Generator:
                                  if fy: flags += "y"
                                  if fp: flags += "p"
                                  val_br = f"{nid:03X}:{flags}"
-                             except:
-                                 val_br = val_tr 
+                             except ValueError:
+                                  val_br = val_tr 
                   
                   tile = Map16Tile(f"0000", self.act_as)
                   apply_to_subtile(tile.sub_tiles[0], val_tl)

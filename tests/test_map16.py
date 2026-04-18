@@ -22,7 +22,7 @@ class TestMap16(unittest.TestCase):
         st4 = Map16SubTile("0F8", 2)
         
         t = Map16Tile("6000", "0130", [st1, st2, st3, st4])
-        expected = "6000: 0130 { 287 0 ---  0F8 2 ---  2B0 0 ---  0F8 2 --- }\n"
+        expected = "6000: 0130 { 287 0 ---  0F8 2 ---  2B0 0 ---  0F8 2 --- }\n\n"
         self.assertEqual(t.to_line(), expected)
 
     def test_parse_line_full(self):

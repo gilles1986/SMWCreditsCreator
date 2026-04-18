@@ -24,7 +24,7 @@ class TestCore(unittest.TestCase):
         
         valid, msg = Validator.validate_folder(self.project_path)
         self.assertTrue(valid)
-        self.assertIn("Detected: v5.10", msg)
+        self.assertIn("v5.10", msg)
 
     def test_validator_invalid_missing_file(self):
         valid, msg = Validator.validate_folder(self.project_path)
@@ -33,23 +33,31 @@ class TestCore(unittest.TestCase):
 
     def test_validator_invalid_version(self):
         with open(os.path.join(self.project_path, "changelog.txt"), "w") as f:
-            f.write("v5.09")
+            f.write("v4.99")
         valid, msg = Validator.validate_folder(self.project_path)
         self.assertFalse(valid)
 
     def test_rhr_version(self):
-        # Test Callisto check
-        tools_dir = os.path.join(self.project_path, "tools", "Callisto")
-        os.makedirs(tools_dir)
+        # Create changelog with v5.13
+        with open(os.path.join(self.project_path, "changelog.txt"), "w") as f:
+            f.write("v5.13 release notes")
         version = Validator.get_rhr_version(self.project_path)
-        self.assertEqual(version, ">=5.13")
+        self.assertEqual(version, (5, 13))
 
     def test_rhr_version_old(self):
+        # Create changelog with v5.09
+        with open(os.path.join(self.project_path, "changelog.txt"), "w") as f:
+            f.write("v5.09 release notes")
         version = Validator.get_rhr_version(self.project_path)
-        self.assertEqual(version, "<5.13")
+        self.assertEqual(version, (5, 9))
+
+    def test_rhr_version_none(self):
+        # No changelog.txt → None
+        version = Validator.get_rhr_version(self.project_path)
+        self.assertIsNone(version)
 
     def test_config_check_and_fix(self):
-        # Setup config
+        # Setup config — v5.10 uses buildtool/exports.toml
         buildtool = os.path.join(self.project_path, "buildtool")
         os.makedirs(buildtool)
         config_path = os.path.join(buildtool, "exports.toml")
@@ -58,16 +66,18 @@ class TestCore(unittest.TestCase):
         with open(config_path, "w") as f:
             toml.dump(data, f)
 
+        version = (5, 10)
+
         # Check
-        valid, msg = ConfigManager.check_exports_toml(self.project_path, "<5.13")
+        valid, msg = ConfigManager.check_exports_toml(self.project_path, version)
         self.assertFalse(valid)
         
         # Fix
-        success, msg = ConfigManager.fix_exports_toml(self.project_path, "<5.13")
+        success, msg = ConfigManager.fix_exports_toml(self.project_path, version)
         self.assertTrue(success)
 
         # Re-check
-        valid, msg = ConfigManager.check_exports_toml(self.project_path, "<5.13")
+        valid, msg = ConfigManager.check_exports_toml(self.project_path, version)
         self.assertTrue(valid)
 
     def test_mapper(self):

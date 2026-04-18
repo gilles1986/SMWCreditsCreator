@@ -53,11 +53,11 @@ class ClipboardHandler:
                 
                 kernel32.GlobalUnlock(hMem)
                 
-                # SetClipboardData takes ownership of hMem
+                # SetClipboardData takes ownership of hMem on success
                 if not user32.SetClipboardData(u_format, hMem):
-                     # If failed, we should free, but usually system handles it?
-                     # Actually if SetClipboardData fails, we must free.
                      kernel32.GlobalFree(hMem)
+                     user32.CloseClipboard()
+                     return False
 
         finally:
             user32.CloseClipboard()

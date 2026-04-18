@@ -26,7 +26,7 @@ if __name__ == "__main__":
             import tkinter as tk
             root = tk.Tk()
             root.withdraw()
-        except:
+        except Exception:
              pass
         
         err_msg = "".join(traceback.format_exception(None, e, e.__traceback__))

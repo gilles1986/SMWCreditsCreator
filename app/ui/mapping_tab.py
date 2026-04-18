@@ -233,7 +233,7 @@ class MappingTab:
                 return "BG2"
             elif 0x280 <= tile_id <= 0x2FF:
                 return "BG3"
-        except:
+        except ValueError:
             pass
         return None
     
@@ -309,7 +309,7 @@ class MappingTab:
                         entry.insert(0, new_hex)
                         self.mapper.set_mapping(char, new_hex)
                         converted_count += 1
-                except:
+                except (ValueError, TypeError):
                     pass
         
         # Switch GFX Slot
@@ -457,9 +457,8 @@ class MappingTab:
                      parts.append(f"{int(id_str, 16)}:{flags}")
                  else:
                      parts.append(int(p, 16))
-        except:
-             parts = []
-             
+        except (ValueError, TypeError):
+             parts = []             
         # Default fallback if empty
         if not parts:
             parts = [0] * (2 if tile_size == "8x16" else 4)
@@ -778,7 +777,7 @@ class MappingTab:
                         else:
                             try:
                                 ids.append(int(p.strip(), 16))
-                            except:
+                            except (ValueError, TypeError):
                                 ids.append(0)
                  
                  # Create composite image
@@ -804,12 +803,12 @@ class MappingTab:
                          p = tid_or_str.split(':')
                          try:
                              tid = int(p[0], 16)
-                         except:
+                         except ValueError:
                              tid = 0
                          flags = p[1]
                      elif isinstance(tid_or_str, str): # Plain hex string possibly
                          try: tid = int(tid_or_str, 16)
-                         except: tid = int(tid_or_str)
+                         except ValueError: tid = 0
                          
                      local_idx = tid - base_offset
                      if 0 <= local_idx < (len(self.raw_pixels)//64):
@@ -1179,12 +1178,12 @@ class MappingTab:
                                  parts = x.split(':')
                                  try:
                                      formatted_vals.append(f"{int(parts[0]):03X}:{parts[1]}")
-                                 except:
+                                 except (ValueError, TypeError):
                                      formatted_vals.append(x)
                              else:
                                  try:
                                      formatted_vals.append(f"{int(x, 16):03X}")
-                                 except:
+                                 except (ValueError, TypeError):
                                      formatted_vals.append(x)
                          else:
                              formatted_vals.append(f"{x:03X}")

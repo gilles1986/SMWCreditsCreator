@@ -341,8 +341,8 @@ class CreditsTab:
         try:
             start_page = int(self.ent_start_page.get(), 16)
             self.config.set("start_page", start_page)
-        except:
-            pass  # Ignore invalid hex
+        except ValueError:
+            pass  # Keep previous valid start_page
 
     def browse_file(self):
         file = filedialog.askopenfilename(filetypes=[("Credits File", "*.json *.txt")])
@@ -463,7 +463,7 @@ class CreditsTab:
             
             # Map16 Page
             try: page_val = int(self.ent_start_page.get(), 16)
-            except: page_val = 0
+            except ValueError: page_val = 0
             
             return tiles, page_val
             

@@ -112,8 +112,7 @@ class SNESGraphics:
                         try:
                             r, g, b = int(parts[0]), int(parts[1]), int(parts[2])
                             colors.append((r, g, b))
-                        except: pass
-                return colors
+                        except (ValueError, TypeError): pass
             except Exception as e:
                 print(f"JASC-PAL decode error: {e}")
         
