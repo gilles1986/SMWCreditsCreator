@@ -1,7 +1,8 @@
 import customtkinter as ctk
 import os
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from app.core.mapper import Mapper
+from app.core.validator import Validator
 from app.ui.theme import Theme
 from app.core.app_config import AppConfig
 from app.core.snes_graphics import SNESGraphics
@@ -394,12 +395,16 @@ class MappingTab:
                 entry.configure(state="disabled")
             else:
                 entry.bind("<FocusOut>", lambda event, c=char, e=entry: self.update_mapping(c, e))
+                entry.bind("<KeyRelease>", lambda event, c=char, e=entry: self._validate_entry(c, e))
             
             self.entries[char] = entry
             
         # Update icons if graphics loaded
         if self.raw_pixels:
             self.update_icons()
+        
+        # Validate all entries on load
+        self._validate_all_entries()
         
         # Update converter button based on current mappings
         self.update_converter_button()
@@ -690,7 +695,40 @@ class MappingTab:
     def update_mapping(self, char, entry):
         val = entry.get().strip()
         self.mapper.set_mapping(char, val)
-        self.update_icons() # Trigger update
+        self._validate_entry(char, entry)
+        self.update_icons()
+
+    def _validate_entry(self, char, entry):
+        """Validates a single entry and shows visual feedback."""
+        val = entry.get().strip()
+        if not val:
+            # Empty = no mapping, reset to default style
+            entry.configure(border_color=Theme.BTN_PRIMARY if entry == getattr(self, 'picker_target', None) else "gray")
+            return True
+        
+        valid, msg = Validator.validate_mapping_value(val)
+        if valid:
+            entry.configure(border_color=Theme.TEXT_SUCCESS, border_width=1)
+        else:
+            entry.configure(border_color="#FF4444", border_width=2)
+        return valid
+
+    def _validate_all_entries(self):
+        """Validates all entries. Returns (is_valid, list of (char, value, message))."""
+        errors = []
+        for char, entry in self.entries.items():
+            if char == ' ':
+                continue
+            val = entry.get().strip()
+            if not val:
+                continue
+            valid, msg = Validator.validate_mapping_value(val)
+            if not valid:
+                errors.append((char, val, msg))
+                entry.configure(border_color="#FF4444", border_width=2)
+            else:
+                entry.configure(border_color=Theme.TEXT_SUCCESS, border_width=1)
+        return len(errors) == 0, errors
 
     def update_icons(self):
         if not self.raw_pixels or not getattr(self, 'full_pil_img', None):
@@ -869,10 +907,24 @@ class MappingTab:
              val = entry.get().strip()
              if val:
                  self.mapper.set_mapping(char, val)
-                 
+        
+        # Validate before saving
+        valid, errors = self._validate_all_entries()
+        if not valid:
+            error_list = [f"  '{e[0]}' = '{e[1]}'" for e in errors[:10]]
+            suffix = f"\n  (and {len(errors) - 10} more)" if len(errors) > 10 else ""
+            warn_msg = f"{len(errors)} invalid mapping(s) found:\n" + "\n".join(error_list) + suffix
+            warn_msg += "\n\nSave anyway?"
+            if not messagebox.askyesno("Validation Warning", warn_msg, icon="warning"):
+                return
+
         filepath = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")])
         if filepath:
-            self.mapper.save_mappings(filepath)
+            success, msg = self.mapper.save_mappings(filepath)
+            if success:
+                messagebox.showinfo("Saved", "Mappings saved successfully.")
+            else:
+                messagebox.showwarning("Saved with Warnings", msg)
 
     def load_mapping(self):
         filepath = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
@@ -882,8 +934,10 @@ class MappingTab:
                 self.current_mapping_name = os.path.basename(filepath)
                 self.lbl_mapping_status.configure(text=f"Mapping: {self.current_mapping_name}", text_color=Theme.BTN_PRIMARY)
                 self.populate_grid()
+                # Show warning if loaded with validation issues
+                if "invalid" in msg.lower():
+                    messagebox.showwarning("Loaded with Warnings", msg)
             else:
-                from tkinter import messagebox
                 messagebox.showerror("Error", msg)
 
     def load_palette(self):

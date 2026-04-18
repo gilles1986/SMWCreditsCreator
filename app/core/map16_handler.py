@@ -22,8 +22,9 @@ class Map16SubTile:
         try:
             val = int(self.tile_id, 16)
             t_str = f"{val:03X}"
-        except:
-             t_str = self.tile_id # Fallback if not hex
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid tile_id '{self.tile_id}' in to_string(), using 000")
+            t_str = "000"
              
         return f"{t_str} {self.palette} {flags}"
 
@@ -52,8 +53,9 @@ class Map16Tile:
             # Parse and re-format to ensure 4 digits (matching error example)
             val = int(self.act_as, 16)
             act_as_str = f"{val:04X}"
-        except:
-            act_as_str = self.act_as # Fallback if not hex
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid act_as '{self.act_as}' in to_line(), using 0025")
+            act_as_str = "0025"
             
         subs_str = "  ".join([st.to_string() for st in self.sub_tiles])
         return f"{self.tile_number}: {act_as_str} {{ {subs_str} }}\n\n"
@@ -171,7 +173,9 @@ class Map16Handler:
             try:
                 val = int(act_as, 16)
                 act_as = f"{val:04X}"
-            except: pass
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid act_as '{act_as}' in text export, using 0025")
+                act_as = "0025"
             
             # Export Order: TL, BL, TR, BR (Column Major)
             # Internal List (ExportTab): TL, TR, BL, BR
@@ -230,7 +234,8 @@ class Map16Handler:
             # Format: yxpccctttttttttt
             try:
                 tid = int(st.tile_id, 16)
-            except:
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid tile_id '{st.tile_id}' in pack_subtile(), using 0")
                 tid = 0
             
             pal = st.palette & 0x7
@@ -283,7 +288,8 @@ class Map16Handler:
             try:
                 # User input is usually Hex String like "130"
                 act = int(tile.act_as, 16)
-            except:
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid act_as '{tile.act_as}' in binary export, using 0x25")
                 act = 0x25
             data.extend(struct.pack("<H", act))
             
@@ -350,13 +356,12 @@ class Map16Handler:
         act_bytes = bytearray()
         
         def pack_subtile(st):
-             # Same as binary export
-            try: tid = int(st.tile_id, 16)
-            except: tid = 0
+            try:
+                tid = int(st.tile_id, 16)
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid tile_id '{st.tile_id}' in clipboard pack, using 0")
+                tid = 0
             val = (tid & 0x3FF) | ((st.palette & 0x7) << 10) | ((1 if st.priority else 0) << 13) | ((1 if st.flip_x else 0) << 14) | ((1 if st.flip_y else 0) << 15)
-            # Binary export used LE, check debug output
-            # Dump: 0101a201...
-            # Looks like LE words.
             return val
 
         for tile in process_tiles:
@@ -383,7 +388,9 @@ class Map16Handler:
             
             # Act As
             try: val = int(tile.act_as, 16)
-            except: val = 0x25
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid act_as '{tile.act_as}' in clipboard, using 0x25")
+                val = 0x25
             act_bytes.extend(struct.pack("<H", val))
             
         full_data = header + tile_bytes + act_bytes
@@ -688,15 +695,17 @@ class Map16Generator:
                  try:
                       int_id = int(base_id, 16)
                       hex_id = f"{int_id:03X}"
-                 except:
-                      hex_id = "000" # Fallback
+                 except (ValueError, TypeError):
+                      logger.warning(f"Invalid tile_id '{base_id}' in get_id_and_flags(), using 000")
+                      hex_id = "000"
                  
                  fx = 'x' in flags_str
                  fy = 'y' in flags_str
                  fp = 'p' in flags_str
                  
                  return hex_id, fx, fy, fp
-             except:
+             except Exception as e:
+                 logger.warning(f"Unexpected error in get_id_and_flags('{val}'): {e}")
                  return "000", False, False, False
         
         # Helper method to apply properties to a specific sub-tile

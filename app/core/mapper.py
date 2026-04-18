@@ -1,6 +1,7 @@
 import json
 import logging
 from app.core.map16_handler import Map16SubTile, Map16Tile, Map16Handler
+from app.core.validator import Validator
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +12,12 @@ class Mapper:
         
     def set_mapping(self, char, tile_id):
         self.mappings[char] = tile_id
+        
+    def validate_mapping(self, char, tile_id):
+        """Validates a single mapping entry. Returns (is_valid, error_message)."""
+        if not tile_id or not tile_id.strip():
+            return True, ""  # Empty = no mapping, OK
+        return Validator.validate_mapping_value(tile_id)
         
     def delete_mapping(self, char):
         if char in self.mappings:
@@ -23,10 +30,16 @@ class Mapper:
         try:
             with open(filepath, 'r') as f:
                 data = json.load(f)
-                # Support both old format (full dict) and new (just mappings)
-                # If "mappings" key exists, use it. Else assume root is mappings? 
-                # Or stick to structure. Structure is {"mappings": {...}}
                 self.mappings = data.get("mappings", {})
+                
+            # Validate loaded mappings
+            valid, errors = Validator.validate_all_mappings(self.mappings)
+            if not valid:
+                error_chars = [f"'{e[0]}' = '{e[1]}'" for e in errors[:10]]
+                suffix = f" (and {len(errors) - 10} more)" if len(errors) > 10 else ""
+                warning = f"Loaded with {len(errors)} invalid mapping(s):\n" + "\n".join(error_chars) + suffix
+                logger.warning(warning)
+                return True, warning
                 
             return True, "Mappings loaded."
         except Exception as e:
@@ -34,10 +47,25 @@ class Mapper:
             return False, f"Error loading mappings: {e}"
 
     def save_mappings(self, filepath):
+        # Validate before saving
+        valid, errors = Validator.validate_all_mappings(self.mappings)
+        if not valid:
+            error_chars = [f"'{e[0]}' = '{e[1]}': {e[2]}" for e in errors[:10]]
+            suffix = f"\n(and {len(errors) - 10} more)" if len(errors) > 10 else ""
+            warning = f"{len(errors)} invalid mapping(s) found:\n" + "\n".join(error_chars) + suffix
+            logger.warning(f"Saving with validation warnings: {warning}")
+            # Still save, but return the warning
+            try:
+                data = {"mappings": self.mappings}
+                with open(filepath, 'w') as f:
+                    json.dump(data, f, indent=4)
+                return False, warning
+            except Exception as e:
+                logger.error(f"Error saving mappings: {e}")
+                return False, f"Error saving mappings: {e}"
+        
         try:
-            data = {
-                "mappings": self.mappings
-            }
+            data = {"mappings": self.mappings}
             with open(filepath, 'w') as f:
                 json.dump(data, f, indent=4)
             return True, "Mappings saved."
@@ -144,16 +172,21 @@ class Mapper:
             # Check for comma-separated value (e.g. "200, 202" for 16x16)
             if ',' in val_part:
                 # Comma mode: Treat as string, do not increment.
-                # Only supports Single Character mapping effectively, or assigning SAME value to range.
                 is_comma = True
                 hex_str = val_part
+                # Validate each comma-separated part
+                valid, msg = Validator.validate_mapping_value(val_part)
+                if not valid:
+                    report.append(f"Invalid hex value in line: {line} ({msg})")
+                    continue
             else:
                 is_comma = False
-                try:
-                    start_tile = int(val_part, 16)
-                except ValueError:
-                    report.append(f"Invalid hex value '{val_part}' in line: {line}")
+                # Validate the hex value
+                valid, msg = Validator.validate_tile_id(val_part)
+                if not valid:
+                    report.append(f"Invalid hex value '{val_part}' in line: {line} ({msg})")
                     continue
+                start_tile = int(val_part, 16)
 
             # Check if Range
             if "-" in key_part and len(key_part) == 3: # Simple A-Z check
@@ -181,6 +214,9 @@ class Mapper:
                     if is_comma:
                         self.mappings[char] = hex_str
                     else:
+                        if curr_tile > Validator.MAX_TILE_ID:
+                            report.append(f"Warning: Range {key_part} overflows at '{char}' (0x{curr_tile:X} > 0x{Validator.MAX_TILE_ID:X})")
+                            break
                         self.mappings[char] = f"{curr_tile:X}"
                         curr_tile += 1
                     count += 1
@@ -207,6 +243,9 @@ class Mapper:
                     if is_comma:
                          self.mappings[char] = hex_str
                     else:
+                         if curr_tile > Validator.MAX_TILE_ID:
+                             report.append(f"Warning: Set {key_part} overflows at '{char}' (0x{curr_tile:X} > 0x{Validator.MAX_TILE_ID:X})")
+                             break
                          self.mappings[char] = f"{curr_tile:X}"
                          curr_tile += 1
                     count += 1

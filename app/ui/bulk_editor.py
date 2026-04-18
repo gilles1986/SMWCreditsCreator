@@ -73,6 +73,10 @@ Note: All tile IDs are in Hexadecimal.
         clear_val = self.var_clear.get()
         success, msg = self.mapper.apply_bulk_rules(rules, clear_first=clear_val)
         if success:
+            from tkinter import messagebox
+            # Show warnings if any validation issues were found
+            if "invalid" in msg.lower() or "overflow" in msg.lower() or "warning" in msg.lower():
+                messagebox.showwarning("Applied with Warnings", msg)
             if self.on_apply_callback:
                 self.on_apply_callback()
             self.destroy()

@@ -408,6 +408,17 @@ class CreditsTab:
                 else:
                     return None, None
 
+            # Validate all mappings before generating
+            valid, errors = Validator.validate_all_mappings(self.mapper.mappings)
+            if not valid:
+                error_list = [f"  '{e[0]}' = '{e[1]}': {e[2]}" for e in errors[:10]]
+                suffix = f"\n  (and {len(errors) - 10} more)" if len(errors) > 10 else ""
+                warn_msg = f"{len(errors)} invalid tile mapping(s) found:\n" + "\n".join(error_list) + suffix
+                warn_msg += "\n\nInvalid values will produce garbled tile data.\nGenerate anyway?"
+                self.log(f"Warning: {len(errors)} invalid mapping(s) detected.")
+                if not messagebox.askyesno("Mapping Validation Warning", warn_msg, icon="warning"):
+                    return None, None
+
             credits_data = None
             mode = self.src_mode_var.get()
             
